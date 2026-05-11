@@ -77,7 +77,7 @@ describe("Validation Schemas", () => {
 
     it("rejects invalid order type", () => {
       const invalid = {
-        type: "INVALID" as any,
+        type: "INVALID" as unknown as "DINE_IN",
         items: [{ productId: "c6s9m1p0z0000000000000000", quantity: 1, addons: [] }],
       };
       const result = createOrderSchema.safeParse(invalid);

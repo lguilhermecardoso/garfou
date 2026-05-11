@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# GARFOU
 
-## Getting Started
+Plataforma SaaS multitenancy para restaurantes, focada em operacao real, mobile-first e deploy serverless na Vercel FREE.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router + TypeScript
+- TailwindCSS + shadcn/ui + Lucide
+- Prisma + PostgreSQL
+- Auth.js v5
+- TanStack Query (polling realtime)
+- Stripe (billing)
+- Vitest + React Testing Library + Playwright
+
+## Estado atual rapido
+
+- Arquitetura base consolidada
+- Multitenancy e RBAC implementados
+- Rate limiting em endpoints publicos
+- 115 testes passando
+- Cobertura global: 86.88% statements
+- E2E preparado via Playwright
+
+## Rodando local
+
+1. Suba o banco PostgreSQL local
+
+```bash
+docker compose up -d
+```
+
+2. Instale dependencias
+
+```bash
+npm install
+```
+
+3. Configure ambiente
+
+```bash
+cp .env.example .env.local
+```
+
+4. Rode migrations
+
+```bash
+npx prisma migrate dev
+```
+
+5. Inicie a aplicacao
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Qualidade
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run lint
+npm run typecheck
+npm test
+npm run test:coverage
+npm run test:e2e
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Documentacao
 
-## Learn More
+- Arquitetura geral: docs/architecture/overview.md
+- Status consolidado: docs/architecture/project-status.md
+- Master spec viva: docs/specs/master-spec.md
+- TODO vivo: docs/specs/todo.md
+- Log de progresso: docs/specs/progress-log.md
+- Seguranca: docs/architecture/security.md
+- Realtime: docs/realtime/strategy.md
+- Multi-tenancy: docs/multi-tenancy/strategy.md
+- Endpoints: docs/api/endpoints.md
+- Testes: docs/testing/strategy.md
+- ADRs: docs/decisions/adr.md
 
-To learn more about Next.js, take a look at the following resources:
+## Observacoes de arquitetura
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- 100% Vercel FREE friendly (sem websocket persistente)
+- Realtime por polling inteligente (TanStack Query)
+- Repository pattern para isolamento de tenant
+- Soft delete e trilha de auditoria no dominio

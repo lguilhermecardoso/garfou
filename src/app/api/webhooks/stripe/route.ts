@@ -24,13 +24,19 @@ export async function POST(req: Request) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const restaurantId = session.metadata?.restaurantId;
-      if (restaurantId) {
+      if (restaurantId && session.mode === "subscription") {
+        // Fetch subscription to get accurate status (may be TRIALING if trial was set)
+        const subId = session.subscription as string;
+        const sub = await stripe.subscriptions.retrieve(subId);
+        const status = sub.status.toUpperCase() as "ACTIVE" | "TRIALING";
+
         await prisma.restaurant.update({
           where: { id: restaurantId },
           data: {
             stripeCustomerId: session.customer as string,
-            stripeSubscriptionId: session.subscription as string,
-            subscriptionStatus: "ACTIVE",
+            stripeSubscriptionId: subId,
+            subscriptionStatus: status,
+            trialEndsAt: sub.trial_end ? new Date(sub.trial_end * 1000) : null,
           },
         });
       }
@@ -42,7 +48,11 @@ export async function POST(req: Request) {
       await prisma.restaurant.updateMany({
         where: { stripeSubscriptionId: subscription.id },
         data: {
-          subscriptionStatus: subscription.status.toUpperCase() as "ACTIVE" | "PAST_DUE" | "CANCELED" | "TRIALING",
+          subscriptionStatus: subscription.status.toUpperCase() as
+            | "ACTIVE"
+            | "PAST_DUE"
+            | "CANCELED"
+            | "TRIALING",
         },
       });
       break;
@@ -54,6 +64,24 @@ export async function POST(req: Request) {
         where: { stripeSubscriptionId: subscription.id },
         data: { subscriptionStatus: "CANCELED" },
       });
+      break;
+    }
+
+    case "invoice.payment_failed": {
+      const invoice = event.data.object as Stripe.Invoice;
+      const subId =
+        typeof invoice.subscription === "string" ? invoice.subscription : invoice.subscription?.id;
+      if (subId) {
+        await prisma.restaurant.updateMany({
+          where: { stripeSubscriptionId: subId },
+          data: { subscriptionStatus: "PAST_DUE" },
+        });
+      }
+      break;
+    }
+
+    case "customer.subscription.trial_will_end": {
+      // 3 days before trial ends — could trigger a notification (no-op for now)
       break;
     }
   }

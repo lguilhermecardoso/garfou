@@ -1,9 +1,11 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { orderRepository } from '../order.repository';
-import { prisma } from '@/lib/db';
-import type { OrderStatus } from '@prisma/client';
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { orderRepository } from "../order.repository";
+import { prisma } from "@/lib/db";
+import type { OrderStatus } from "@prisma/client";
 
-vi.mock('@/lib/db', () => ({
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+vi.mock("@/lib/db", () => ({
   prisma: {
     $transaction: vi.fn(),
     order: {
@@ -16,28 +18,28 @@ vi.mock('@/lib/db', () => ({
   },
 }));
 
-const mockRestaurantId = 'rest-123';
+const mockRestaurantId = "rest-123";
 
-describe('orderRepository', () => {
+describe("orderRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('findMany', () => {
-    it('should find all orders for a restaurant with pagination', async () => {
+  describe("findMany", () => {
+    it("should find all orders for a restaurant with pagination", async () => {
       const mockOrders = [
         {
-          id: 'order-1',
+          id: "order-1",
           orderNumber: 1,
           restaurantId: mockRestaurantId,
-          customer: { id: 'cust-1', name: 'John', phone: '123456' },
+          customer: { id: "cust-1", name: "John", phone: "123456" },
           items: [],
         },
         {
-          id: 'order-2',
+          id: "order-2",
           orderNumber: 2,
           restaurantId: mockRestaurantId,
-          customer: { id: 'cust-2', name: 'Jane', phone: '654321' },
+          customer: { id: "cust-2", name: "Jane", phone: "654321" },
           items: [],
         },
       ];
@@ -52,11 +54,11 @@ describe('orderRepository', () => {
       expect(result.pageSize).toBe(20);
     });
 
-    it('should filter orders by status (single)', async () => {
+    it("should filter orders by status (single)", async () => {
       const mockOrders = [
         {
-          id: 'order-1',
-          status: 'CONFIRMADO' as OrderStatus,
+          id: "order-1",
+          status: "CONFIRMADO" as OrderStatus,
           restaurantId: mockRestaurantId,
           items: [],
         },
@@ -65,45 +67,43 @@ describe('orderRepository', () => {
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([mockOrders, 1]);
 
       const result = await orderRepository.findMany(mockRestaurantId, {
-        status: 'CONFIRMADO',
+        status: "CONFIRMADO",
       });
 
-      expect(result.orders[0].status).toBe('CONFIRMADO');
+      expect(result.orders[0].status).toBe("CONFIRMADO");
       expect(result.total).toBe(1);
     });
 
-    it('should filter orders by multiple statuses', async () => {
+    it("should filter orders by multiple statuses", async () => {
       const mockOrders = [
-        { id: 'order-1', status: 'CONFIRMADO' as OrderStatus },
-        { id: 'order-2', status: 'EM_PREPARO' as OrderStatus },
+        { id: "order-1", status: "CONFIRMADO" as OrderStatus },
+        { id: "order-2", status: "EM_PREPARO" as OrderStatus },
       ];
 
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([mockOrders, 2]);
 
       const result = await orderRepository.findMany(mockRestaurantId, {
-        status: ['CONFIRMADO', 'EM_PREPARO'],
+        status: ["CONFIRMADO", "EM_PREPARO"],
       });
 
       expect(result.orders).toHaveLength(2);
     });
 
-    it('should filter orders by type', async () => {
-      const mockOrders = [
-        { id: 'order-1', type: 'MESA' as const },
-      ];
+    it("should filter orders by type", async () => {
+      const mockOrders = [{ id: "order-1", type: "MESA" as const }];
 
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([mockOrders, 1]);
 
       const result = await orderRepository.findMany(mockRestaurantId, {
-        type: 'MESA',
+        type: "MESA",
       });
 
-      expect(result.orders[0].type).toBe('MESA');
+      expect(result.orders[0].type).toBe("MESA");
     });
 
-    it('should filter orders by date range', async () => {
-      const from = new Date('2026-01-01');
-      const to = new Date('2026-01-31');
+    it("should filter orders by date range", async () => {
+      const from = new Date("2026-01-01");
+      const to = new Date("2026-01-31");
 
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([[], 0]);
 
@@ -112,7 +112,7 @@ describe('orderRepository', () => {
       expect(prisma.$transaction).toHaveBeenCalled();
     });
 
-    it('should handle pagination', async () => {
+    it("should handle pagination", async () => {
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([[], 100]);
 
       const result = await orderRepository.findMany(mockRestaurantId, {
@@ -125,16 +125,16 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('findById', () => {
-    it('should find order by id with all relations', async () => {
+  describe("findById", () => {
+    it("should find order by id with all relations", async () => {
       const mockOrder = {
-        id: 'order-1',
+        id: "order-1",
         restaurantId: mockRestaurantId,
-        customer: { id: 'cust-1', name: 'John', phone: '123456' },
+        customer: { id: "cust-1", name: "John", phone: "123456" },
         items: [
           {
-            id: 'item-1',
-            product: { id: 'prod-1', name: 'Pizza' },
+            id: "item-1",
+            product: { id: "prod-1", name: "Pizza" },
             addons: [],
           },
         ],
@@ -142,33 +142,33 @@ describe('orderRepository', () => {
 
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce(mockOrder as any);
 
-      const result = await orderRepository.findById(mockRestaurantId, 'order-1');
+      const result = await orderRepository.findById(mockRestaurantId, "order-1");
 
       expect(result).toEqual(mockOrder);
-      expect(result?.customer.name).toBe('John');
+      expect(result?.customer.name).toBe("John");
       expect(result?.items).toHaveLength(1);
     });
 
-    it('should return null if order not found', async () => {
+    it("should return null if order not found", async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce(null);
 
-      const result = await orderRepository.findById(mockRestaurantId, 'order-999');
+      const result = await orderRepository.findById(mockRestaurantId, "order-999");
 
       expect(result).toBeNull();
     });
 
-    it('should ensure restaurantId matches for security', async () => {
-      const order = { id: 'order-1', restaurantId: mockRestaurantId };
+    it("should ensure restaurantId matches for security", async () => {
+      const order = { id: "order-1", restaurantId: mockRestaurantId };
 
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce(order as any);
 
-      await orderRepository.findById(mockRestaurantId, 'order-1');
+      await orderRepository.findById(mockRestaurantId, "order-1");
 
       // Verify findFirst was called with both id and restaurantId
       expect(prisma.order.findFirst).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            id: 'order-1',
+            id: "order-1",
             restaurantId: mockRestaurantId,
           }),
         })
@@ -176,18 +176,18 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('findPrintQueue', () => {
-    it('should find orders pending print', async () => {
+  describe("findPrintQueue", () => {
+    it("should find orders pending print", async () => {
       const mockOrders = [
         {
-          id: 'order-1',
-          status: 'CONFIRMADO',
+          id: "order-1",
+          status: "CONFIRMADO",
           printConfirmed: false,
           items: [],
         },
         {
-          id: 'order-2',
-          status: 'EM_PREPARO',
+          id: "order-2",
+          status: "EM_PREPARO",
           printConfirmed: false,
           items: [],
         },
@@ -201,7 +201,7 @@ describe('orderRepository', () => {
       expect(result.every((o: any) => !o.printConfirmed)).toBe(true);
     });
 
-    it('should exclude already printed orders', async () => {
+    it("should exclude already printed orders", async () => {
       vi.mocked(prisma.order.findMany).mockResolvedValueOnce([] as any);
 
       const result = await orderRepository.findPrintQueue(mockRestaurantId);
@@ -210,8 +210,8 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('getNextOrderNumber', () => {
-    it('should return 1 if no orders exist', async () => {
+  describe("getNextOrderNumber", () => {
+    it("should return 1 if no orders exist", async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce(null);
 
       const result = await orderRepository.getNextOrderNumber(mockRestaurantId);
@@ -219,7 +219,7 @@ describe('orderRepository', () => {
       expect(result).toBe(1);
     });
 
-    it('should increment last order number', async () => {
+    it("should increment last order number", async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce({
         orderNumber: 42,
       } as any);
@@ -229,7 +229,7 @@ describe('orderRepository', () => {
       expect(result).toBe(43);
     });
 
-    it('should isolate by restaurantId', async () => {
+    it("should isolate by restaurantId", async () => {
       vi.mocked(prisma.order.findFirst).mockResolvedValueOnce({
         orderNumber: 10,
       } as any);
@@ -246,18 +246,18 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('create', () => {
-    it('should create order with provided data', async () => {
+  describe("create", () => {
+    it("should create order with provided data", async () => {
       const orderData = {
         orderNumber: 1,
-        type: 'MESA' as const,
+        type: "MESA" as const,
         total: 100,
-        status: 'NOVO_PEDIDO' as OrderStatus,
+        status: "NOVO_PEDIDO" as OrderStatus,
         items: { create: [] },
       };
 
       const mockCreatedOrder = {
-        id: 'order-1',
+        id: "order-1",
         ...orderData,
         items: [],
       };
@@ -266,18 +266,18 @@ describe('orderRepository', () => {
 
       const result = await orderRepository.create(mockRestaurantId, orderData as any);
 
-      expect(result.id).toBe('order-1');
+      expect(result.id).toBe("order-1");
       expect(result.orderNumber).toBe(1);
     });
 
-    it('should connect to restaurant', async () => {
+    it("should connect to restaurant", async () => {
       const orderData = {
         orderNumber: 1,
         items: { create: [] },
       };
 
       vi.mocked(prisma.order.create).mockResolvedValueOnce({
-        id: 'order-1',
+        id: "order-1",
       } as any);
 
       await orderRepository.create(mockRestaurantId, orderData as any);
@@ -292,37 +292,29 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('updateStatus', () => {
-    it('should update order status', async () => {
+  describe("updateStatus", () => {
+    it("should update order status", async () => {
       const updatedOrder = {
-        id: 'order-1',
-        status: 'EM_PREPARO' as OrderStatus,
+        id: "order-1",
+        status: "EM_PREPARO" as OrderStatus,
       };
 
       vi.mocked(prisma.order.update).mockResolvedValueOnce(updatedOrder as any);
 
-      const result = await orderRepository.updateStatus(
-        mockRestaurantId,
-        'order-1',
-        'EM_PREPARO'
-      );
+      const result = await orderRepository.updateStatus(mockRestaurantId, "order-1", "EM_PREPARO");
 
-      expect(result.status).toBe('EM_PREPARO');
+      expect(result.status).toBe("EM_PREPARO");
     });
 
-    it('should enforce restaurantId in where clause', async () => {
+    it("should enforce restaurantId in where clause", async () => {
       vi.mocked(prisma.order.update).mockResolvedValueOnce({} as any);
 
-      await orderRepository.updateStatus(
-        mockRestaurantId,
-        'order-1',
-        'CONFIRMADO'
-      );
+      await orderRepository.updateStatus(mockRestaurantId, "order-1", "CONFIRMADO");
 
       expect(prisma.order.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({
-            id: 'order-1',
+            id: "order-1",
             restaurantId: mockRestaurantId,
           }),
         })
@@ -330,33 +322,30 @@ describe('orderRepository', () => {
     });
   });
 
-  describe('confirmPrint', () => {
-    it('should set printConfirmed flag and timestamp', async () => {
+  describe("confirmPrint", () => {
+    it("should set printConfirmed flag and timestamp", async () => {
       const updatedOrder = {
-        id: 'order-1',
+        id: "order-1",
         printConfirmed: true,
-        printedAt: new Date('2026-05-11T12:00:00Z'),
+        printedAt: new Date("2026-05-11T12:00:00Z"),
       };
 
       vi.mocked(prisma.order.update).mockResolvedValueOnce(updatedOrder as any);
 
-      const result = await orderRepository.confirmPrint(
-        mockRestaurantId,
-        'order-1'
-      );
+      const result = await orderRepository.confirmPrint(mockRestaurantId, "order-1");
 
       expect(result.printConfirmed).toBe(true);
       expect(result.printedAt).toBeDefined();
     });
 
-    it('should enforce restaurantId isolation', async () => {
+    it("should enforce restaurantId isolation", async () => {
       vi.mocked(prisma.order.update).mockResolvedValueOnce({} as any);
 
-      await orderRepository.confirmPrint(mockRestaurantId, 'order-1');
+      await orderRepository.confirmPrint(mockRestaurantId, "order-1");
 
       expect(prisma.order.update).toHaveBeenCalledWith({
         where: {
-          id: 'order-1',
+          id: "order-1",
           restaurantId: mockRestaurantId,
         },
         data: {

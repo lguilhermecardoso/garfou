@@ -2,6 +2,8 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { orderService } from "@/features/orders/order.service";
 import type { OrderStatus } from "@prisma/client";
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Mock dependencies
 vi.mock("@/repositories/order.repository", () => ({
   orderRepository: {
@@ -83,11 +85,7 @@ describe("orderService", () => {
         status: "CONFIRMADO",
       });
 
-      expect(orderRepository.updateStatus).toHaveBeenCalledWith(
-        "rest-1",
-        "order-1",
-        "CONFIRMADO"
-      );
+      expect(orderRepository.updateStatus).toHaveBeenCalledWith("rest-1", "order-1", "CONFIRMADO");
     });
 
     it("allows CONFIRMADO to EM_PREPARO transition", async () => {
@@ -158,9 +156,9 @@ describe("orderService", () => {
 
       vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([]);
 
-      await expect(
-        orderService.createOrder("rest-1", input as any)
-      ).rejects.toThrow("Um ou mais produtos não encontrados ou inativos");
+      await expect(orderService.createOrder("rest-1", input as any)).rejects.toThrow(
+        "Um ou mais produtos não encontrados ou inativos"
+      );
     });
 
     it("throws error when product count mismatch", async () => {
@@ -177,9 +175,9 @@ describe("orderService", () => {
         { id: "prod-1", price: 1000, addons: [] } as any,
       ]);
 
-      await expect(
-        orderService.createOrder("rest-1", input as any)
-      ).rejects.toThrow("Um ou mais produtos não encontrados ou inativos");
+      await expect(orderService.createOrder("rest-1", input as any)).rejects.toThrow(
+        "Um ou mais produtos não encontrados ou inativos"
+      );
     });
 
     it("creates order with valid products", async () => {

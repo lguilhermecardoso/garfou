@@ -45,6 +45,7 @@ export function SettingsForm({ restaurantId }: Props) {
 
   useEffect(() => {
     if (restaurant) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setForm({
         name: restaurant.name,
         phone: restaurant.phone ?? "",
@@ -76,7 +77,7 @@ export function SettingsForm({ restaurantId }: Props) {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-500" />
+        <div className="border-primary-200 border-t-primary-500 h-8 w-8 animate-spin rounded-full border-4" />
       </div>
     );
   }
@@ -85,35 +86,63 @@ export function SettingsForm({ restaurantId }: Props) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-neutral-900">Configurações</h1>
-        {saved && (
-          <span className="text-sm font-medium text-emerald-600">✓ Salvo com sucesso</span>
-        )}
+        {saved && <span className="text-sm font-medium text-emerald-600">✓ Salvo com sucesso</span>}
       </div>
 
       {/* Informações gerais */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-neutral-100">
-          <Store className="h-5 w-5 text-primary-500" aria-hidden="true" />
+      <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-neutral-100 pb-2">
+          <Store className="text-primary-500 h-5 w-5" aria-hidden="true" />
           <h2 className="font-semibold text-neutral-900">Informações do restaurante</h2>
         </div>
 
-        <Input label="Nome" id="name" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} required />
-        <Input label="Telefone / WhatsApp" id="phone" type="tel" value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))} />
-        <Input label="Endereço" id="address" value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} />
+        <Input
+          label="Nome"
+          id="name"
+          value={form.name}
+          onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
+          required
+        />
+        <Input
+          label="Telefone / WhatsApp"
+          id="phone"
+          type="tel"
+          value={form.phone}
+          onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
+        />
+        <Input
+          label="Endereço"
+          id="address"
+          value={form.address}
+          onChange={(e) => setForm((p) => ({ ...p, address: e.target.value }))}
+        />
         <div className="grid grid-cols-2 gap-3">
-          <Input label="Cidade" id="city" value={form.city} onChange={(e) => setForm(p => ({ ...p, city: e.target.value }))} />
-          <Input label="Estado" id="state" value={form.state} onChange={(e) => setForm(p => ({ ...p, state: e.target.value.toUpperCase().slice(0, 2) }))} maxLength={2} />
+          <Input
+            label="Cidade"
+            id="city"
+            value={form.city}
+            onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
+          />
+          <Input
+            label="Estado"
+            id="state"
+            value={form.state}
+            onChange={(e) =>
+              setForm((p) => ({ ...p, state: e.target.value.toUpperCase().slice(0, 2) }))
+            }
+            maxLength={2}
+          />
         </div>
       </div>
 
       {/* Cardápio digital */}
-      <div className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
-        <div className="flex items-center gap-3 pb-2 border-b border-neutral-100">
-          <Globe className="h-5 w-5 text-primary-500" aria-hidden="true" />
+      <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-neutral-100 pb-2">
+          <Globe className="text-primary-500 h-5 w-5" aria-hidden="true" />
           <h2 className="font-semibold text-neutral-900">Cardápio digital</h2>
         </div>
         <div>
-          <p className="text-sm text-neutral-500 mb-1">URL do seu cardápio</p>
+          <p className="mb-1 text-sm text-neutral-500">URL do seu cardápio</p>
           <code className="block rounded-lg bg-neutral-100 px-3 py-2 text-sm text-neutral-700">
             {typeof window !== "undefined" ? window.location.origin : ""}/menu/{restaurant?.slug}
           </code>
@@ -122,8 +151,8 @@ export function SettingsForm({ restaurantId }: Props) {
 
       {/* Status */}
       <div className="rounded-2xl bg-white p-6 shadow-sm">
-        <div className="flex items-center gap-3 pb-3 border-b border-neutral-100 mb-4">
-          <Clock className="h-5 w-5 text-primary-500" aria-hidden="true" />
+        <div className="mb-4 flex items-center gap-3 border-b border-neutral-100 pb-3">
+          <Clock className="text-primary-500 h-5 w-5" aria-hidden="true" />
           <h2 className="font-semibold text-neutral-900">Status do restaurante</h2>
         </div>
         <label className="flex cursor-pointer items-center gap-3">
@@ -131,16 +160,24 @@ export function SettingsForm({ restaurantId }: Props) {
             <input
               type="checkbox"
               checked={form.isOpen}
-              onChange={(e) => setForm(p => ({ ...p, isOpen: e.target.checked }))}
+              onChange={(e) => setForm((p) => ({ ...p, isOpen: e.target.checked }))}
               className="sr-only"
             />
-            <div className={`h-6 w-11 rounded-full transition-colors ${form.isOpen ? "bg-emerald-500" : "bg-neutral-300"}`}>
-              <div className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isOpen ? "translate-x-5" : "translate-x-0.5"}`} />
+            <div
+              className={`h-6 w-11 rounded-full transition-colors ${form.isOpen ? "bg-emerald-500" : "bg-neutral-300"}`}
+            >
+              <div
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isOpen ? "translate-x-5" : "translate-x-0.5"}`}
+              />
             </div>
           </div>
           <div>
-            <p className="font-medium text-neutral-900">{form.isOpen ? "Aberto agora" : "Fechado"}</p>
-            <p className="text-sm text-neutral-400">Controla a disponibilidade do cardápio digital</p>
+            <p className="font-medium text-neutral-900">
+              {form.isOpen ? "Aberto agora" : "Fechado"}
+            </p>
+            <p className="text-sm text-neutral-400">
+              Controla a disponibilidade do cardápio digital
+            </p>
           </div>
         </label>
       </div>

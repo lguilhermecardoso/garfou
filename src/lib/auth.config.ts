@@ -3,7 +3,6 @@
  * Usado apenas no proxy (edge runtime) para verificar sessão JWT.
  */
 import type { NextAuthConfig } from "next-auth";
-import Credentials from "next-auth/providers/credentials";
 import Google from "next-auth/providers/google";
 
 export const authConfig: NextAuthConfig = {
@@ -17,9 +16,6 @@ export const authConfig: NextAuthConfig = {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
     }),
-    // Credentials provider declarado sem `authorize` para que o proxy saiba
-    // que a rota /auth/signin existe. A lógica real fica no auth.ts (Node.js).
-    Credentials({}),
   ],
   callbacks: {
     authorized({ auth, request: { nextUrl } }) {

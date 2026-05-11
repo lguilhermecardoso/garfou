@@ -2,18 +2,18 @@
 
 ## Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | Next.js 15+ App Router |
-| Language | TypeScript |
-| Styling | TailwindCSS v4 + shadcn/ui |
-| ORM | Prisma |
-| Database | PostgreSQL |
-| Auth | NextAuth v5 (Auth.js) |
-| State/Cache | TanStack Query |
-| Validation | Zod |
-| Payments | Stripe |
-| Hosting | Vercel FREE |
+| Layer       | Technology                 |
+| ----------- | -------------------------- |
+| Framework   | Next.js 16 App Router      |
+| Language    | TypeScript                 |
+| Styling     | TailwindCSS v4 + shadcn/ui |
+| ORM         | Prisma                     |
+| Database    | PostgreSQL                 |
+| Auth        | NextAuth v5 (Auth.js)      |
+| State/Cache | TanStack Query             |
+| Validation  | Zod                        |
+| Payments    | Stripe                     |
+| Hosting     | Vercel FREE                |
 
 ## Folder Structure
 

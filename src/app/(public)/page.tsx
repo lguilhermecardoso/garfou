@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import {
   UtensilsCrossed,
   Tablet,
@@ -16,39 +18,72 @@ import {
 import { STRIPE_PLANS } from "@/lib/stripe";
 import { formatCurrency } from "@/lib/utils";
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const session = await auth();
+  const userId = session?.user?.id;
+
+  let systemHref = "/auth/signin";
+  if (userId) {
+    const membership = await prisma.userRestaurant.findFirst({
+      where: { userId },
+      select: { restaurantId: true },
+      orderBy: { createdAt: "asc" },
+    });
+    systemHref = membership ? `/dashboard/${membership.restaurantId}` : "/onboarding";
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Header */}
       <header className="sticky top-0 z-50 border-b border-neutral-100 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <UtensilsCrossed className="h-7 w-7 text-primary-500" aria-hidden="true" />
+            <UtensilsCrossed className="text-primary-500 h-7 w-7" aria-hidden="true" />
             <span className="text-xl font-bold text-neutral-900">GARFOU</span>
           </div>
           <nav className="hidden items-center gap-6 md:flex" aria-label="Navegação principal">
-            <a href="#features" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
+            <a
+              href="#features"
+              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+            >
               Funcionalidades
             </a>
-            <a href="#plans" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
+            <a
+              href="#plans"
+              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+            >
               Planos
             </a>
-            <a href="#faq" className="text-sm text-neutral-600 hover:text-neutral-900 transition-colors">
+            <a
+              href="#faq"
+              className="text-sm text-neutral-600 transition-colors hover:text-neutral-900"
+            >
               FAQ
             </a>
           </nav>
           <div className="flex items-center gap-3">
-            <Link href="/auth/signin">
-              <Button variant="ghost" size="sm">
-                Entrar
-              </Button>
-            </Link>
-            <Link href="/auth/signup">
-              <Button size="sm">
-                Começar grátis
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </Link>
+            {userId ? (
+              <Link href={systemHref}>
+                <Button size="sm">
+                  Acessar sistema
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </Link>
+            ) : (
+              <>
+                <Link href="/auth/signin">
+                  <Button variant="ghost" size="sm">
+                    Entrar
+                  </Button>
+                </Link>
+                <Link href="/auth/signup">
+                  <Button size="sm">
+                    Começar grátis
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -58,26 +93,28 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" aria-hidden="true" />
         <div className="relative mx-auto max-w-4xl text-center">
           <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-sm backdrop-blur-sm">
-            <Zap className="h-3.5 w-3.5 text-accent-400" aria-hidden="true" />
+            <Zap className="text-accent-400 h-3.5 w-3.5" aria-hidden="true" />
             <span>Novo: Impressão térmica automática</span>
           </div>
-          <h1 className="mb-6 text-4xl font-bold leading-tight tracking-tight sm:text-5xl md:text-6xl">
-            O sistema que o seu{" "}
-            <span className="text-primary-400">restaurante</span>{" "}
-            merece
+          <h1 className="mb-6 text-4xl leading-tight font-bold tracking-tight sm:text-5xl md:text-6xl">
+            O sistema que o seu <span className="text-primary-400">restaurante</span> merece
           </h1>
           <p className="mx-auto mb-10 max-w-2xl text-lg text-neutral-300 sm:text-xl">
-            Cardápio digital, pedidos, tela de cozinha, app do garçom, gestão
-            financeira e muito mais. Tudo em um só lugar, sem complicação.
+            Cardápio digital, pedidos, tela de cozinha, app do garçom, gestão financeira e muito
+            mais. Tudo em um só lugar, sem complicação.
           </p>
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href="/auth/signup">
+            <Link href={userId ? systemHref : "/auth/signup"}>
               <Button size="xl" className="w-full sm:w-auto">
-                Começar 14 dias grátis
+                {userId ? "Acessar sistema" : "Começar 14 dias grátis"}
                 <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             </Link>
-            <Button variant="outline" size="xl" className="w-full bg-transparent text-white border-white/30 hover:bg-white/10 sm:w-auto">
+            <Button
+              variant="outline"
+              size="xl"
+              className="w-full border-white/30 bg-transparent text-white hover:bg-white/10 sm:w-auto"
+            >
               Ver demonstração
             </Button>
           </div>
@@ -102,12 +139,10 @@ export default function LandingPage() {
             {features.map((feature) => (
               <Card key={feature.title} className="group hover:shadow-elevated transition-shadow">
                 <CardContent className="p-6">
-                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary-50 group-hover:bg-primary-100 transition-colors">
-                    <feature.icon className="h-6 w-6 text-primary-500" aria-hidden="true" />
+                  <div className="bg-primary-50 group-hover:bg-primary-100 mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl transition-colors">
+                    <feature.icon className="text-primary-500 h-6 w-6" aria-hidden="true" />
                   </div>
-                  <h3 className="mb-2 text-lg font-semibold text-neutral-900">
-                    {feature.title}
-                  </h3>
+                  <h3 className="mb-2 text-lg font-semibold text-neutral-900">{feature.title}</h3>
                   <p className="text-sm text-neutral-500">{feature.description}</p>
                 </CardContent>
               </Card>
@@ -131,11 +166,15 @@ export default function LandingPage() {
             {Object.entries(STRIPE_PLANS).map(([key, plan]) => (
               <Card
                 key={key}
-                className={key === "PRO" ? "border-primary-500 shadow-elevated ring-2 ring-primary-500 ring-offset-2" : ""}
+                className={
+                  key === "PRO"
+                    ? "border-primary-500 shadow-elevated ring-primary-500 ring-2 ring-offset-2"
+                    : ""
+                }
               >
                 <CardContent className="p-8">
                   {key === "PRO" && (
-                    <div className="mb-4 inline-flex items-center gap-1 rounded-full bg-primary-500 px-3 py-1 text-xs font-semibold text-white">
+                    <div className="bg-primary-500 mb-4 inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold text-white">
                       <Star className="h-3 w-3" aria-hidden="true" />
                       Mais popular
                     </div>
@@ -149,17 +188,20 @@ export default function LandingPage() {
                   </div>
                   <ul className="mb-8 space-y-3">
                     {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-center gap-2 text-sm text-neutral-700">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" aria-hidden="true" />
+                      <li
+                        key={feature}
+                        className="flex items-center gap-2 text-sm text-neutral-700"
+                      >
+                        <CheckCircle2
+                          className="h-4 w-4 shrink-0 text-emerald-500"
+                          aria-hidden="true"
+                        />
                         {feature}
                       </li>
                     ))}
                   </ul>
                   <Link href={`/auth/signup?plan=${key.toLowerCase()}`}>
-                    <Button
-                      className="w-full"
-                      variant={key === "PRO" ? "default" : "outline"}
-                    >
+                    <Button className="w-full" variant={key === "PRO" ? "default" : "outline"}>
                       Começar grátis
                     </Button>
                   </Link>
@@ -193,12 +235,16 @@ export default function LandingPage() {
           <h2 className="mb-4 text-3xl font-bold sm:text-4xl">
             Pronto para transformar seu restaurante?
           </h2>
-          <p className="mb-8 text-lg text-primary-100">
+          <p className="text-primary-100 mb-8 text-lg">
             Junte-se a centenas de restaurantes que já usam o GARFOU.
           </p>
-          <Link href="/auth/signup">
-            <Button size="xl" variant="secondary" className="bg-white text-primary-600 hover:bg-primary-50">
-              Começar agora — é grátis
+          <Link href={userId ? systemHref : "/auth/signup"}>
+            <Button
+              size="xl"
+              variant="secondary"
+              className="text-primary-600 hover:bg-primary-50 bg-white"
+            >
+              {userId ? "Entrar no sistema" : "Começar agora — é grátis"}
               <ArrowRight className="h-5 w-5" aria-hidden="true" />
             </Button>
           </Link>
@@ -209,7 +255,7 @@ export default function LandingPage() {
       <footer className="border-t border-neutral-200 px-4 py-8 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <UtensilsCrossed className="h-5 w-5 text-primary-500" aria-hidden="true" />
+            <UtensilsCrossed className="text-primary-500 h-5 w-5" aria-hidden="true" />
             <span className="font-semibold text-neutral-700">GARFOU</span>
           </div>
           <p className="text-sm text-neutral-400">
@@ -249,14 +295,12 @@ const features = [
   {
     icon: BarChart3,
     title: "Relatórios e dashboard",
-    description:
-      "Vendas, ticket médio, produtos mais pedidos, horários de pico e muito mais.",
+    description: "Vendas, ticket médio, produtos mais pedidos, horários de pico e muito mais.",
   },
   {
     icon: Shield,
     title: "Seguro e confiável",
-    description:
-      "Multitenancy seguro, RBAC, autenticação robusta e backups automáticos.",
+    description: "Multitenancy seguro, RBAC, autenticação robusta e backups automáticos.",
   },
 ];
 

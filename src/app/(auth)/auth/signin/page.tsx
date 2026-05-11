@@ -5,6 +5,6 @@ interface Props {
 }
 
 export default async function SignInPage({ searchParams }: Props) {
-  const { callbackUrl = "/" } = await searchParams;
+  const { callbackUrl = "/auth/after-login" } = await searchParams;
   return <SignInForm callbackUrl={callbackUrl} />;
 }
