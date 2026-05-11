@@ -1,0 +1,45 @@
+import { prisma } from "@/lib/db";
+import { notFound } from "next/navigation";
+import type { Metadata } from "next";
+import { DigitalMenuClient } from "@/features/menu/digital-menu-client";
+
+interface Props {
+  params: Promise<{ slug: string }>;
+}
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { slug, deletedAt: null },
+    select: { name: true },
+  });
+  return {
+    title: restaurant ? `Cardápio — ${restaurant.name}` : "Cardápio",
+  };
+}
+
+export default async function DigitalMenuPage({ params }: Props) {
+  const { slug } = await params;
+
+  const restaurant = await prisma.restaurant.findUnique({
+    where: { slug, deletedAt: null },
+    select: {
+      id: true,
+      name: true,
+      logo: true,
+      isOpen: true,
+      settings: true,
+    },
+  });
+
+  if (!restaurant) notFound();
+
+  return (
+    <DigitalMenuClient
+      restaurantId={restaurant.id}
+      restaurantName={restaurant.name}
+      restaurantLogo={restaurant.logo}
+      isOpen={restaurant.isOpen}
+    />
+  );
+}
