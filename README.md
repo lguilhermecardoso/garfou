@@ -66,17 +66,34 @@ npm run build
 
 ## Documentacao
 
+### Visão Geral
+
 - Arquitetura geral: docs/architecture/overview.md
 - Status consolidado: docs/architecture/project-status.md
 - Master spec viva: docs/specs/master-spec.md
 - TODO vivo: docs/specs/todo.md
 - Log de progresso: docs/specs/progress-log.md
+
+### Implementações Recentes
+
+- **📋 [Resumo em Português](docs/specs/RESUMO-IMPLEMENTACOES.md)** ← Implementações de 2026-05-12
+- **📋 [Recent Implementations (EN)](docs/specs/recent-implementations.md)** ← Para agentes de IA
+
+### Features
+
+- Pedidos: docs/features/orders.md
+- Estoque: docs/features/inventory.md
+- Caixa: docs/features/cash-register.md
+
+### Arquitetura Técnica
+
 - Seguranca: docs/architecture/security.md
 - Realtime: docs/realtime/strategy.md
 - Multi-tenancy: docs/multi-tenancy/strategy.md
 - Endpoints: docs/api/endpoints.md
 - Testes: docs/testing/strategy.md
 - ADRs: docs/decisions/adr.md
+- Impressão: docs/printing/architecture.md
 
 ## Observacoes de arquitetura
 

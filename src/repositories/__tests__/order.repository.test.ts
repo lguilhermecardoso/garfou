@@ -90,15 +90,15 @@ describe("orderRepository", () => {
     });
 
     it("should filter orders by type", async () => {
-      const mockOrders = [{ id: "order-1", type: "MESA" as const }];
+      const mockOrders = [{ id: "order-1", type: "DINE_IN" as const, customer: null, items: [] }];
 
       vi.mocked(prisma.$transaction).mockResolvedValueOnce([mockOrders, 1]);
 
       const result = await orderRepository.findMany(mockRestaurantId, {
-        type: "MESA",
+        type: "DINE_IN",
       });
 
-      expect(result.orders[0].type).toBe("MESA");
+      expect(result.orders[0].type).toBe("DINE_IN");
     });
 
     it("should filter orders by date range", async () => {
@@ -145,7 +145,7 @@ describe("orderRepository", () => {
       const result = await orderRepository.findById(mockRestaurantId, "order-1");
 
       expect(result).toEqual(mockOrder);
-      expect(result?.customer.name).toBe("John");
+      expect(result?.customer?.name).toBe("John");
       expect(result?.items).toHaveLength(1);
     });
 
@@ -250,7 +250,7 @@ describe("orderRepository", () => {
     it("should create order with provided data", async () => {
       const orderData = {
         orderNumber: 1,
-        type: "MESA" as const,
+        type: "DINE_IN" as const,
         total: 100,
         status: "NOVO_PEDIDO" as OrderStatus,
         items: { create: [] },
@@ -259,6 +259,7 @@ describe("orderRepository", () => {
       const mockCreatedOrder = {
         id: "order-1",
         ...orderData,
+        customer: null,
         items: [],
       };
 

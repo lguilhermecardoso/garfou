@@ -16,40 +16,42 @@ Consolidar o estado real do projeto para continuidade por agentes de IA sem retr
 - Multitenancy, RBAC e rate limiting implementados
 - Módulo de pedidos: ciclo completo operacional incluindo modal de detalhe, impressão térmica
   (Bematech MP-4200 58mm) e widget de ações rápidas no dashboard
+- Módulo de cardápio: personalização de itens e produtos divididos em partes implementados no gestor e no cardápio digital
 - Testes automatizados ativos com cobertura global acima da meta
 - Ainda existem lacunas de feature-complete para operação de restaurante real
 
 ## Matriz de aderencia
 
-| Area                                            | Status       | Evidencias                                                    |
-| ----------------------------------------------- | ------------ | ------------------------------------------------------------- |
-| Next.js + TS + App Router                       | Concluido    | src/app, package.json                                         |
-| Tailwind + shadcn/ui + lucide                   | Concluido    | src/components/ui, dependencias                               |
-| Prisma + PostgreSQL                             | Concluido    | prisma/schema.prisma, docs/database/schema.md                 |
-| Vercel FREE friendly                            | Concluido    | docs/deploy/vercel.md, polling em realtime                    |
-| Realtime sem websocket persistente              | Concluido    | docs/realtime/strategy.md, kitchen polling 3s                 |
-| Multitenancy (single DB + isolamento)           | Concluido    | docs/multi-tenancy/strategy.md, repositories com restaurantId |
-| RBAC + seguranca baseline                       | Concluido    | src/lib/rbac.ts, docs/architecture/security.md                |
-| Rate limit endpoints publicos                   | Concluido    | src/lib/rate-limit.ts, rotas register/orders/nps              |
-| Testes unitarios/integracao base                | Concluido    | 115 testes passando                                           |
-| Cobertura minima 80%                            | Concluido    | 86.88% statements                                             |
-| E2E Playwright                                  | Parcial      | infra criada, estabilizacao de cenarios pendente              |
-| Impressao termica no browser (58mm)             | Concluido    | src/features/orders/order-print-receipt.tsx                   |
-| Modal de detalhe de pedido                      | Concluido    | src/features/orders/order-detail-modal.tsx                    |
-| Dashboard widget de pedidos pendentes           | Concluido    | src/features/orders/dashboard-pending-orders.tsx              |
-| Print Agent local (daemon/electron)             | Nao iniciado | apenas arquitetura documentada                                |
-| Fluxo WhatsApp completo                         | Nao iniciado | sem envio automatizado, apenas diretriz                       |
-| Operacao completa de entrega (bairro/raio/taxa) | Parcial      | estrutura existe, regras completas pendentes                  |
-| Horario de funcionamento automatico             | Parcial      | suporte parcial no dominio                                    |
-| Stripe assinatura fim a fim                     | Parcial      | base de stripe existente, ciclo completo pendente             |
-| Storybook ou rota dev/components                | Concluido    | src/app/dev/components/page.tsx                               |
+| Area                                            | Status       | Evidencias                                                     |
+| ----------------------------------------------- | ------------ | -------------------------------------------------------------- |
+| Next.js + TS + App Router                       | Concluido    | src/app, package.json                                          |
+| Tailwind + shadcn/ui + lucide                   | Concluido    | src/components/ui, dependencias                                |
+| Prisma + PostgreSQL                             | Concluido    | prisma/schema.prisma, docs/database/schema.md                  |
+| Vercel FREE friendly                            | Concluido    | docs/deploy/vercel.md, polling em realtime                     |
+| Realtime sem websocket persistente              | Concluido    | docs/realtime/strategy.md, kitchen polling 3s                  |
+| Multitenancy (single DB + isolamento)           | Concluido    | docs/multi-tenancy/strategy.md, repositories com restaurantId  |
+| RBAC + seguranca baseline                       | Concluido    | src/lib/rbac.ts, docs/architecture/security.md                 |
+| Rate limit endpoints publicos                   | Concluido    | src/lib/rate-limit.ts, rotas register/orders/nps               |
+| Testes unitarios/integracao base                | Concluido    | 115 testes passando                                            |
+| Cobertura minima 80%                            | Concluido    | 86.88% statements                                              |
+| E2E Playwright                                  | Parcial      | infra criada, estabilizacao de cenarios pendente               |
+| Impressao termica no browser (58mm)             | Concluido    | src/features/orders/order-print-receipt.tsx                    |
+| Modal de detalhe de pedido                      | Concluido    | src/features/orders/order-detail-modal.tsx                     |
+| Dashboard widget de pedidos pendentes           | Concluido    | src/features/orders/dashboard-pending-orders.tsx               |
+| Print Agent local (daemon/electron)             | Nao iniciado | apenas arquitetura documentada                                 |
+| Fluxo WhatsApp completo                         | Nao iniciado | sem envio automatizado, apenas diretriz                        |
+| Operacao completa de entrega (bairro/raio/taxa) | Parcial      | estrutura existe, regras completas pendentes                   |
+| Horario de funcionamento automatico             | Parcial      | suporte parcial no dominio                                     |
+| Stripe assinatura fim a fim                     | Parcial      | base de stripe existente, ciclo completo pendente              |
+| Storybook ou rota dev/components                | Concluido    | src/app/dev/components/page.tsx                                |
+| Personalização de itens do cardápio             | Concluido    | src/features/menu, src/app/api/restaurants/[restaurantId]/menu |
 
 ## Estado dos modulos de negocio
 
 | Modulo                            | Estado atual                                                                          |
 | --------------------------------- | ------------------------------------------------------------------------------------- |
 | Pedidos                           | Funcional completo — ciclo, modal de detalhe, impressão 58mm, ações rápidas dashboard |
-| Cardapio digital                  | Funcional (publico + interno)                                                         |
+| Cardapio digital                  | Funcional com personalização de itens e divisão em partes                             |
 | App do garcom                     | Funcional base (pedido rapido)                                                        |
 | Tela de cozinha                   | Funcional base com polling e atualizacao de status                                    |
 | Financeiro                        | Funcional base                                                                        |

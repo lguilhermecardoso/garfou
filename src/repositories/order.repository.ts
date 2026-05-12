@@ -34,6 +34,12 @@ export const orderRepository = {
       prisma.order.findMany({
         where,
         include: {
+          tab: {
+            include: {
+              table: true,
+              customer: { select: { id: true, name: true, phone: true } },
+            },
+          },
           customer: { select: { id: true, name: true, phone: true } },
           waiter: { select: { id: true, name: true } },
           items: {
@@ -43,6 +49,14 @@ export const orderRepository = {
                 include: {
                   addon: { select: { id: true, name: true } },
                 },
+              },
+              selectedOptions: {
+                include: {
+                  option: { select: { id: true, name: true } },
+                },
+              },
+              splits: {
+                orderBy: { splitIndex: "asc" },
               },
             },
           },
@@ -61,6 +75,12 @@ export const orderRepository = {
     return prisma.order.findFirst({
       where: { id: orderId, restaurantId },
       include: {
+        tab: {
+          include: {
+            table: true,
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
         customer: { select: { id: true, name: true, phone: true } },
         waiter: { select: { id: true, name: true } },
         items: {
@@ -70,6 +90,14 @@ export const orderRepository = {
               include: {
                 addon: { select: { id: true, name: true } },
               },
+            },
+            selectedOptions: {
+              include: {
+                option: { select: { id: true, name: true } },
+              },
+            },
+            splits: {
+              orderBy: { splitIndex: "asc" },
             },
           },
         },
@@ -85,11 +113,21 @@ export const orderRepository = {
         status: { in: ["CONFIRMADO", "EM_PREPARO"] },
       },
       include: {
+        tab: {
+          include: {
+            table: true,
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
         items: {
           include: {
             product: { select: { name: true } },
             addons: {
               include: { addon: { select: { name: true } } },
+            },
+            selectedOptions: true,
+            splits: {
+              orderBy: { splitIndex: "asc" },
             },
           },
         },
@@ -107,33 +145,41 @@ export const orderRepository = {
     return (last?.orderNumber ?? 0) + 1;
   },
 
-  async create(
-    restaurantId: string,
-    data: Omit<Prisma.OrderCreateInput, "restaurant">
-  ) {
+  async create(restaurantId: string, data: Omit<Prisma.OrderCreateInput, "restaurant">) {
     return prisma.order.create({
       data: {
         ...data,
         restaurant: { connect: { id: restaurantId } },
       },
       include: {
+        tab: {
+          include: {
+            table: true,
+            customer: { select: { id: true, name: true, phone: true } },
+          },
+        },
         items: {
           include: {
             product: { select: { id: true, name: true, image: true } },
+            selectedOptions: true,
+            splits: {
+              orderBy: { splitIndex: "asc" },
+            },
           },
         },
       },
     });
   },
 
-  async updateStatus(
-    restaurantId: string,
-    orderId: string,
-    status: OrderStatus
-  ) {
+  async updateStatus(restaurantId: string, orderId: string, status: OrderStatus) {
     return prisma.order.update({
       where: { id: orderId, restaurantId },
       data: { status },
+      include: {
+        tab: {
+          select: { id: true },
+        },
+      },
     });
   },
 

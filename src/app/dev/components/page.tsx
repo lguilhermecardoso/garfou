@@ -1,6 +1,15 @@
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import {
+  PhoneInput,
+  CPFInput,
+  CNPJInput,
+  CEPInput,
+  EmailInput,
+} from "@/components/ui/masked-input";
+import { CurrencyInput } from "@/components/ui/currency-input";
+import { Card } from "@/components/ui/card";
 
 const ROWS_SPACER = "h-4";
 
@@ -11,7 +20,7 @@ export default function ComponentsPreviewPage() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 p-8 space-y-12">
+    <main className="min-h-screen space-y-12 bg-neutral-50 p-8">
       <header>
         <h1 className="text-3xl font-bold text-neutral-900">Component Library</h1>
         <p className="mt-1 text-neutral-500">Garfou design system preview — dev only</p>
@@ -64,8 +73,68 @@ export default function ComponentsPreviewPage() {
         <h2 className="mb-4 text-xl font-semibold text-neutral-800">Input</h2>
         <div className="max-w-md space-y-4">
           <Input id="demo-1" label="Label padrão" placeholder="Digite algo..." />
-          <Input id="demo-2" label="Com erro" placeholder="Digite algo..." error="Campo obrigatório" />
+          <Input
+            id="demo-2"
+            label="Com erro"
+            placeholder="Digite algo..."
+            error="Campo obrigatório"
+          />
           <Input id="demo-3" label="Desabilitado" placeholder="Não editável" disabled />
+        </div>
+      </section>
+
+      {/* Masked Inputs */}
+      <section>
+        <h2 className="mb-4 text-xl font-semibold text-neutral-800">Masked Inputs (BR)</h2>
+        <div className="max-w-md space-y-4">
+          <PhoneInput label="Telefone" placeholder="(00) 00000-0000" />
+          <CPFInput label="CPF" placeholder="000.000.000-00" />
+          <CNPJInput label="CNPJ" placeholder="00.000.000/0000-00" />
+          <CEPInput label="CEP" placeholder="00000-000" />
+          <EmailInput label="E-mail" placeholder="email@exemplo.com" />
+        </div>
+      </section>
+
+      {/* Currency Input */}
+      <section>
+        <h2 className="mb-4 text-xl font-semibold text-neutral-800">Currency Input (BRL)</h2>
+        <div className="max-w-md space-y-4">
+          <CurrencyInput label="Preço" placeholder="R$ 0,00" />
+          <CurrencyInput label="Taxa de entrega" placeholder="R$ 0,00" />
+          <CurrencyInput label="Desconto" placeholder="R$ 0,00" error="Valor inválido" />
+        </div>
+      </section>
+
+      {/* Cards */}
+      <section>
+        <h2 className="mb-4 text-xl font-semibold text-neutral-800">Card</h2>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-neutral-900">Card Padrão</h3>
+              <p className="mt-2 text-sm text-neutral-600">
+                Este é um card básico com padding e bordas arredondadas.
+              </p>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-neutral-900">Card com Badge</h3>
+              <Badge variant="success" className="mt-2">
+                Ativo
+              </Badge>
+              <p className="mt-2 text-sm text-neutral-600">Card com badge de status.</p>
+            </div>
+          </Card>
+
+          <Card>
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-neutral-900">Card com Ação</h3>
+              <p className="mt-2 mb-4 text-sm text-neutral-600">Card com botão de ação.</p>
+              <Button size="sm">Ver detalhes</Button>
+            </div>
+          </Card>
         </div>
       </section>
 

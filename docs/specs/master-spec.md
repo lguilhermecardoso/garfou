@@ -21,6 +21,7 @@ Build a Vercel-first SaaS platform for real restaurant operations with multitena
 - Next.js 16 + TypeScript + App Router
 - Prisma 7 + PostgreSQL + adapter-pg for serverless compatibility
 - Core modules running in MVP level (orders/menu/kitchen/waiter/finance/inventory)
+- Menu customization flow implemented across manager + public digital menu
 - Public and private flows split with role checks
 - Documentation structure complete under docs/
 

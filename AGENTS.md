@@ -112,16 +112,16 @@ Dev server: `npm run dev` (Turbopack). Seed: `npm run db:seed`.
 
 ### Files
 
-| File                                                               | Purpose                                                              |
-| ------------------------------------------------------------------ | -------------------------------------------------------------------- |
-| `src/features/orders/orders-live-table.tsx`                        | Live table, polls 5s, Eye+✅/❌ actions, opens modal                 |
-| `src/features/orders/order-detail-modal.tsx`                       | Accessible dialog, receipt preview, Confirmar/Recusar/Imprimir       |
-| `src/features/orders/order-print-receipt.tsx`                      | 48-col Bematech 58mm receipt builder + `printOrder()`                |
-| `src/features/orders/dashboard-pending-orders.tsx`                 | Dashboard widget, polls 8s, ≤5 pending orders                        |
-| `src/features/orders/dashboard-new-order-alert.tsx`                | Legacy alert banner (no longer on dashboard main)                    |
-| `src/repositories/order.repository.ts`                             | `findMany()` returns full `items[]`; `findById()` returns full graph |
-| `src/app/api/restaurants/[restaurantId]/orders/route.ts`           | GET list + POST create                                               |
-| `src/app/api/restaurants/[restaurantId]/orders/[orderId]/route.ts` | GET detail + PATCH status                                            |
+| File                                                               | Purpose                                                                                  |
+| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| `src/features/orders/orders-live-table.tsx`                        | Live table, polls 5s, Eye+✅/❌/🚚/✅ actions, opens modal                               |
+| `src/features/orders/order-detail-modal.tsx`                       | Accessible dialog, receipt preview, Confirmar/Recusar/Saiu p/ Entrega/Finalizar/Imprimir |
+| `src/features/orders/order-print-receipt.tsx`                      | 48-col Bematech 58mm receipt builder + `printOrder()`                                    |
+| `src/features/orders/dashboard-pending-orders.tsx`                 | Dashboard widget, polls 8s, ≤5 pending orders                                            |
+| `src/features/orders/dashboard-new-order-alert.tsx`                | Legacy alert banner (no longer on dashboard main)                                        |
+| `src/repositories/order.repository.ts`                             | `findMany()` returns full `items[]`; `findById()` returns full graph                     |
+| `src/app/api/restaurants/[restaurantId]/orders/route.ts`           | GET list + POST create                                                                   |
+| `src/app/api/restaurants/[restaurantId]/orders/[orderId]/route.ts` | GET detail + PATCH status                                                                |
 
 ### Order interface (client-side, from `findMany`)
 
@@ -177,6 +177,99 @@ Pending statuses (need action): `NOVO_PEDIDO`, `AGUARDANDO_CONFIRMACAO`
 
 ---
 
+## 5.1 Inventory Operations Module (implemented 2026-05-12)
+
+### Files
+
+| File                                                                      | Purpose                                                  |
+| ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `src/features/inventory/stock-operations-modal.tsx`                       | Modal for stock operations (IN, OUT, ADJUSTMENT)         |
+| `src/features/inventory/inventory-table.tsx`                              | Table with "Movimentar" button per row, low stock alerts |
+| `src/app/(dashboard)/dashboard/[restaurantId]/inventory/page.tsx`         | Server component fetching items, uses InventoryTable     |
+| `src/app/api/restaurants/[restaurantId]/inventory/[itemId]/move/route.ts` | POST endpoint for stock movements                        |
+
+### Movement types
+
+```typescript
+enum MovementType {
+  IN         // Entrada: adiciona ao estoque
+  OUT        // Saída: remove do estoque
+  ADJUSTMENT // Ajuste: define nova quantidade (delta calculado)
+}
+```
+
+### Key rules
+
+- Stock cannot go negative after any operation
+- ADJUSTMENT calculates delta automatically: `newQuantity - currentQuantity`
+- All movements require a `reason` field (mandatory)
+- Low stock alert when `currentQuantity <= minStock`
+- Auto-refresh after operations using `router.refresh()`
+- Hardcoded operation selector buttons (Tailwind v4 doesn't support dynamic classes)
+
+### API payload for POST /move
+
+```typescript
+{
+  type: "IN" | "OUT" | "ADJUSTMENT",
+  quantity: number,     // For IN/OUT: amount to add/remove
+                        // For ADJUSTMENT: desired new total quantity
+  reason: string,
+  userId: string
+}
+```
+
+---
+
+## 5.2 Menu Customization Module (implemented 2026-05-12)
+
+### Files
+
+| File                                                | Purpose                                                                   |
+| --------------------------------------------------- | ------------------------------------------------------------------------- |
+| `src/features/menu/menu-management.tsx`             | Manager cardápio CRUD + product customization panel                       |
+| `src/features/menu/product-customization-panel.tsx` | Manager controls for modifier groups and split-flavor configuration       |
+| `src/features/menu/digital-menu-client.tsx`         | Public digital menu with customization-aware cart flow                    |
+| `src/features/menu/product-detail-sheet.tsx`        | Bottom sheet for split selection, modifier groups, notes, and price calc  |
+| `src/features/menu/modifier-group-section.tsx`      | Renders a single modifier group in the digital menu                       |
+| `src/features/menu/split-selector.tsx`              | Renders product split selection (2/3/4 parts)                             |
+| `src/features/menu/menu-customization-types.ts`     | Shared menu customization types and price helpers                         |
+| `src/features/menu/product-customization.server.ts` | Server helpers for serializing and persisting customization configuration |
+
+### Product fields
+
+```typescript
+interface ProductCustomizationConfig {
+  allowCustomization: boolean;
+  allowSplit: boolean;
+  maxSplits: 2 | 3 | 4;
+  splitPriceRule: "HIGHEST" | "AVERAGE" | "SUM";
+  modifierGroups: ModifierGroup[];
+  splitFlavors: SplitFlavor[];
+}
+```
+
+### Order item payload additions
+
+```typescript
+interface CreateOrderItemInput {
+  productId: string;
+  quantity: number;
+  notes?: string;
+  selectedOptions: Array<{ optionId: string; quantity: number; isRemoval: boolean }>;
+  splits: Array<{ splitIndex: number; flavorProductId: string }>;
+}
+```
+
+### Key rules
+
+- Customizable products open `ProductDetailSheet` before entering the cart.
+- Split products require exactly `maxSplits` selected flavors.
+- Modifier and split prices are snapshotted at order creation time.
+- Legacy `product_addons` remains supported, but the new feature uses `modifier_groups` and related tables.
+
+---
+
 ## 6. Authentication
 
 - Sign in at `/auth/signin` with Credentials (email + password via bcryptjs)
@@ -185,6 +278,14 @@ Pending statuses (need action): `NOVO_PEDIDO`, `AGUARDANDO_CONFIRMACAO`
 - `src/proxy.ts` checks session for protected routes; public paths defined in `auth.config.ts`
 - Server-side: `import { auth } from "@/lib/auth"` then `await auth()`
 - Client-side: `import { useSession } from "next-auth/react"` (wrapped in `providers.tsx`)
+
+### RBAC (Role-Based Access Control)
+
+- **Location**: `src/lib/rbac.ts`
+- **Function**: `requireRole(restaurantId: string, minRole: UserRole)`
+- **Hierarchy**: OWNER (5) > MANAGER (4) > CASHIER (3) > WAITER (2) > KITCHEN (1)
+- **OWNER privilege**: OWNER role has unrestricted access to ALL operations, bypassing any permission checks. This ensures the restaurant owner can always access and manage all features, regardless of required role.
+- **Usage**: Call `requireRole()` at the start of protected route handlers to verify access
 
 ---
 
@@ -248,7 +349,9 @@ const order = await prisma.order.findFirst({
 | Architecture overview | `docs/architecture/overview.md`       |
 | Project status matrix | `docs/architecture/project-status.md` |
 | Security              | `docs/architecture/security.md`       |
+| Permissions (RBAC)    | `docs/architecture/permissions.md`    |
 | Orders feature        | `docs/features/orders.md`             |
+| Cash Register         | `docs/features/cash-register.md`      |
 | Print architecture    | `docs/printing/architecture.md`       |
 | Living TODO           | `docs/specs/todo.md`                  |
 | Progress log          | `docs/specs/progress-log.md`          |

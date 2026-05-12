@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { OrderDetailModal } from "./order-detail-modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CheckCircle, XCircle, RefreshCw, Eye } from "lucide-react";
+import { CheckCircle, XCircle, RefreshCw, Eye, CheckCheck, Truck } from "lucide-react";
 
 interface Order {
   id: string;
@@ -44,7 +44,7 @@ function playDoorbell() {
     gain.connect(ctx.destination);
     osc.frequency.setValueAtTime(880, ctx.currentTime);
     osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.setValueAtTime(0.95, ctx.currentTime); // MUITO ALTO
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
     osc.start();
     osc.stop(ctx.currentTime + 0.6);
@@ -167,10 +167,13 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                     orders.map((order) => {
                       const isPending =
                         order.status === "NOVO_PEDIDO" || order.status === "AGUARDANDO_CONFIRMACAO";
+                      const isReady = order.status === "PRONTO";
+                      const isOutForDelivery = order.status === "SAIU_PARA_ENTREGA";
+                      const isDelivery = order.type === "DELIVERY";
                       return (
                         <tr
                           key={order.id}
-                          className={`border-b border-neutral-50 transition-colors ${isPending ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-neutral-50"}`}
+                          className={`border-b border-neutral-50 transition-colors ${isPending ? "bg-amber-50 hover:bg-amber-100" : isReady ? "bg-emerald-50 hover:bg-emerald-100" : isOutForDelivery ? "bg-blue-50 hover:bg-blue-100" : "hover:bg-neutral-50"}`}
                         >
                           <td className="px-4 py-3 font-mono text-neutral-600">
                             #{order.orderNumber}
@@ -220,6 +223,28 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                                   </button>
                                 </>
                               )}
+                              {/* Out for delivery for ready delivery orders */}
+                              {isReady && isDelivery && (
+                                <button
+                                  onClick={() => patchStatus(order.id, "SAIU_PARA_ENTREGA")}
+                                  disabled={actioning === order.id}
+                                  title="Marcar como saiu para entrega"
+                                  className="rounded-lg bg-blue-500 p-1.5 text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+                                >
+                                  <Truck className="h-4 w-4" />
+                                </button>
+                              )}
+                              {/* Finalize for ready orders (non-delivery) or out for delivery */}
+                              {(isReady && !isDelivery) || isOutForDelivery ? (
+                                <button
+                                  onClick={() => patchStatus(order.id, "FINALIZADO")}
+                                  disabled={actioning === order.id}
+                                  title="Finalizar pedido"
+                                  className="rounded-lg bg-emerald-500 p-1.5 text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                                >
+                                  <CheckCheck className="h-4 w-4" />
+                                </button>
+                              ) : null}
                             </div>
                           </td>
                         </tr>

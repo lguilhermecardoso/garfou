@@ -11,38 +11,135 @@ import {
   BarChart3,
   Package,
   DollarSign,
+  Receipt,
   Users,
   Settings,
   Star,
   Tag,
   Truck,
   MessageCircle,
+  Table2,
 } from "lucide-react";
+import type { UserRole } from "@/lib/roles";
+import type { MenuItem } from "@/lib/menu-permissions";
+import { filterMenuByRole } from "@/lib/menu-permissions";
 
 interface Props {
   restaurantId: string;
+  userRole: UserRole;
 }
 
-const navItems = [
-  { href: "", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/orders", label: "Pedidos", icon: ShoppingBag },
-  { href: "/kitchen", label: "Cozinha", icon: ChefHat },
-  { href: "/waiter", label: "Garçom", icon: UtensilsCrossed },
-  { href: "/menu", label: "Cardápio", icon: UtensilsCrossed },
-  { href: "/inventory", label: "Estoque", icon: Package },
-  { href: "/finance", label: "Financeiro", icon: DollarSign },
-  { href: "/customers", label: "Clientes", icon: Users },
-  { href: "/reports", label: "Relatórios", icon: BarChart3 },
-  { href: "/coupons", label: "Cupons", icon: Tag },
-  { href: "/delivery", label: "Entrega", icon: Truck },
-  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
-  { href: "/nps", label: "NPS", icon: Star },
-  { href: "/settings", label: "Configurações", icon: Settings },
+const navItems: MenuItem[] = [
+  {
+    href: "",
+    label: "Dashboard",
+    icon: LayoutDashboard,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"],
+  },
+  {
+    href: "/orders",
+    label: "Pedidos",
+    icon: ShoppingBag,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER", "WAITER", "KITCHEN"],
+  },
+  {
+    href: "/kitchen",
+    label: "Cozinha",
+    icon: ChefHat,
+    allowedRoles: ["OWNER", "MANAGER", "KITCHEN"],
+  },
+  {
+    href: "/waiter",
+    label: "Garçom",
+    icon: UtensilsCrossed,
+    allowedRoles: ["OWNER", "MANAGER", "WAITER"],
+  },
+  {
+    href: "/pos",
+    label: "PDV",
+    icon: Receipt,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    href: "/settings/tables",
+    label: "Mesas",
+    icon: Table2,
+    allowedRoles: ["OWNER", "MANAGER", "WAITER"],
+  },
+  {
+    href: "/menu",
+    label: "Cardápio",
+    icon: UtensilsCrossed,
+    allowedRoles: ["OWNER", "MANAGER"],
+  },
+  {
+    href: "/inventory",
+    label: "Estoque",
+    icon: Package,
+    allowedRoles: ["OWNER", "MANAGER"],
+  },
+  {
+    href: "/finance",
+    label: "Financeiro",
+    icon: DollarSign,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    href: "/customers",
+    label: "Clientes",
+    icon: Users,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER", "WAITER"],
+  },
+  {
+    href: "/reports",
+    label: "Relatórios",
+    icon: BarChart3,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    href: "/coupons",
+    label: "Cupons",
+    icon: Tag,
+    allowedRoles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    href: "/delivery",
+    label: "Entrega",
+    icon: Truck,
+    allowedRoles: ["OWNER", "MANAGER", "WAITER"],
+  },
+  {
+    href: "/whatsapp",
+    label: "WhatsApp",
+    icon: MessageCircle,
+    allowedRoles: ["OWNER", "MANAGER"],
+  },
+  {
+    href: "/nps",
+    label: "NPS",
+    icon: Star,
+    allowedRoles: ["OWNER", "MANAGER"],
+  },
+  {
+    href: "/settings/team",
+    label: "Equipe",
+    icon: Users,
+    allowedRoles: ["OWNER"],
+  },
+  {
+    href: "/settings",
+    label: "Configurações",
+    icon: Settings,
+    allowedRoles: ["OWNER", "MANAGER"],
+  },
 ];
 
-export function DashboardSidebar({ restaurantId }: Props) {
+export function DashboardSidebar({ restaurantId, userRole }: Props) {
   const pathname = usePathname();
   const base = `/dashboard/${restaurantId}`;
+
+  // Filtra os itens do menu baseado na role do usuário
+  const visibleItems = filterMenuByRole(navItems, userRole);
 
   return (
     <aside
@@ -58,7 +155,7 @@ export function DashboardSidebar({ restaurantId }: Props) {
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3">
         <ul className="space-y-0.5" role="list">
-          {navItems.map((item) => {
+          {visibleItems.map((item) => {
             const href = `${base}${item.href}`;
             const isActive = item.href === "" ? pathname === base : pathname.startsWith(href);
 

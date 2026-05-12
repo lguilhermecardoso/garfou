@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -40,14 +41,21 @@ export function NewInventoryItemForm({ restaurantId }: Props) {
 
       const payload = await res.json();
       if (!res.ok) {
-        setError(payload?.error ?? "Erro ao salvar item.");
+        const errorMsg = payload?.error ?? "Erro ao salvar item.";
+        setError(errorMsg);
+        toast.error(errorMsg);
         return;
       }
 
+      toast.success("Item adicionado ao estoque!", {
+        description: `${name} foi adicionado com sucesso`,
+      });
       router.push(`/dashboard/${restaurantId}/inventory`);
       router.refresh();
     } catch {
-      setError("Erro inesperado ao salvar item.");
+      const errorMsg = "Erro inesperado ao salvar item.";
+      setError(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -107,10 +115,16 @@ export function NewInventoryItemForm({ restaurantId }: Props) {
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
       <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={() => router.push(`/dashboard/${restaurantId}/inventory`)}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => router.push(`/dashboard/${restaurantId}/inventory`)}
+        >
           Cancelar
         </Button>
-        <Button type="submit" loading={loading}>Salvar item</Button>
+        <Button type="submit" loading={loading}>
+          Salvar item
+        </Button>
       </div>
     </form>
   );

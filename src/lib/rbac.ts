@@ -40,12 +40,19 @@ export function hasMinRole(userRole: UserRole, minRole: UserRole): boolean {
 /**
  * Verifica acesso e retorna { userId, role } ou lança 401/403.
  * Use como guard no início de route handlers protegidos.
+ *
+ * OWNER sempre tem acesso total, independente da role requerida.
  */
 export async function requireRole(restaurantId: string, minRole: UserRole = "WAITER") {
   const membership = await getRestaurantMembership(restaurantId);
 
   if (!membership) {
     return { error: "Não autorizado", status: 401 } as const;
+  }
+
+  // OWNER tem acesso total a tudo, independente de permissão
+  if (membership.role === "OWNER") {
+    return { userId: membership.userId, role: membership.role };
   }
 
   if (!hasMinRole(membership.role, minRole)) {

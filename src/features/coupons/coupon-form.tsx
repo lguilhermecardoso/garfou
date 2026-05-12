@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
 interface Props {
   restaurantId: string;
@@ -43,10 +44,15 @@ export function CouponForm({ restaurantId }: Props) {
     setLoading(false);
 
     if (!res.ok) {
-      setError(data.error ?? "Erro ao criar cupom");
+      const errorMsg = data.error ?? "Erro ao criar cupom";
+      setError(errorMsg);
+      toast.error(errorMsg);
       return;
     }
 
+    toast.success("Cupom criado com sucesso!", {
+      description: `Código: ${body.code}`,
+    });
     router.push(`/dashboard/${restaurantId}/coupons`);
     router.refresh();
   }

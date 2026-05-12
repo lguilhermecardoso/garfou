@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { Button } from "@/components/ui/button";
 
@@ -82,7 +83,7 @@ export default function KitchenScreen({ restaurantId }: Props) {
       gain.connect(ctx.destination);
       oscillator.frequency.setValueAtTime(880, ctx.currentTime);
       oscillator.frequency.setValueAtTime(1100, ctx.currentTime + 0.1);
-      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.setValueAtTime(0.95, ctx.currentTime); // MUITO ALTO
       gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
       oscillator.start(ctx.currentTime);
       oscillator.stop(ctx.currentTime + 0.5);
@@ -118,10 +119,16 @@ export default function KitchenScreen({ restaurantId }: Props) {
       );
       return { prev };
     },
+    onSuccess: (_, { status }) => {
+      const statusLabel =
+        status === "EM_PREPARO" ? "em preparo" : status === "PRONTO" ? "pronto" : "atualizado";
+      toast.success(`Pedido ${statusLabel}!`);
+    },
     onError: (_err, _vars, ctx) => {
       if (ctx?.prev) {
         queryClient.setQueryData(["kitchen-orders", restaurantId], ctx.prev);
       }
+      toast.error("Erro ao atualizar pedido.");
     },
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ["kitchen-orders", restaurantId] });

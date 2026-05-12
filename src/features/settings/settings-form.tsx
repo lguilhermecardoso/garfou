@@ -2,6 +2,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Save, Store, Clock, Globe } from "lucide-react";
@@ -71,6 +72,10 @@ export function SettingsForm({ restaurantId }: Props) {
       qc.invalidateQueries({ queryKey: ["restaurant-settings", restaurantId] });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success("Configurações salvas com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao salvar configurações.");
     },
   });
 

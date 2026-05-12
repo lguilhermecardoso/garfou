@@ -35,17 +35,102 @@ export const createCategorySchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const createProductSchema = z.object({
+const modifierOptionSchema = z.object({
+  id: z.string().cuid().optional(),
+  name: z.string().min(1, "Nome da opção obrigatório"),
+  price: z.number().min(0, "Preço da opção inválido").default(0),
+  isDefault: z.boolean().default(false),
+  isAvailable: z.boolean().default(true),
+  sortOrder: z.number().int().default(0),
+});
+
+const modifierGroupSchema = z
+  .object({
+    id: z.string().cuid().optional(),
+    name: z.string().min(1, "Nome do grupo obrigatório"),
+    type: z.enum(["INGREDIENT", "ADDON", "REQUIRED_CHOICE", "REQUIRED_MULTI"]),
+    minSelections: z.number().int().min(0).default(0),
+    maxSelections: z.number().int().positive().default(1),
+    sortOrder: z.number().int().default(0),
+    options: z.array(modifierOptionSchema).default([]),
+  })
+  .superRefine((value, ctx) => {
+    if (value.maxSelections < value.minSelections) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "maxSelections deve ser maior ou igual a minSelections",
+        path: ["maxSelections"],
+      });
+    }
+  });
+
+const splitFlavorSchema = z.object({
+  flavorProductId: z.string().cuid("Sabor inválido"),
+  sortOrder: z.number().int().default(0),
+  isAvailable: z.boolean().default(true),
+});
+
+function refineProductSchema(
+  value: {
+    price?: number;
+    allowSplit?: boolean;
+    splitFlavors?: Array<{ flavorProductId: string }>;
+  },
+  ctx: z.RefinementCtx
+) {
+  if (value.allowSplit === false && value.price !== undefined && value.price <= 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Preço deve ser positivo para produtos sem divisão",
+      path: ["price"],
+    });
+  }
+
+  if (
+    value.allowSplit === true &&
+    value.splitFlavors !== undefined &&
+    value.splitFlavors.length === 0
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Selecione ao menos um sabor disponível para divisão",
+      path: ["splitFlavors"],
+    });
+  }
+}
+
+const baseProductSchema = z.object({
   categoryId: z.string().cuid("Categoria inválida"),
   name: z.string().min(1, "Nome obrigatório"),
   description: z.string().optional(),
-  price: z.number().positive("Preço deve ser positivo"),
+  price: z.number().min(0, "Preço não pode ser negativo"),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
   isInternalOnly: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
+  allowCustomization: z.boolean().default(false),
+  allowSplit: z.boolean().default(false),
+  maxSplits: z.union([z.literal(2), z.literal(3), z.literal(4)]).default(2),
+  splitPriceRule: z.enum(["HIGHEST", "AVERAGE", "SUM"]).default("HIGHEST"),
   preparationTime: z.number().int().positive().optional(),
   costPrice: z.number().positive().optional(),
+  modifierGroups: z.array(modifierGroupSchema).default([]),
+  splitFlavors: z.array(splitFlavorSchema).default([]),
+});
+
+export const createProductSchema = baseProductSchema.superRefine(refineProductSchema);
+
+export const updateProductSchema = baseProductSchema.partial().superRefine(refineProductSchema);
+
+const orderSelectedOptionSchema = z.object({
+  optionId: z.string().cuid(),
+  quantity: z.number().int().positive().default(1),
+  isRemoval: z.boolean().default(false),
+});
+
+const orderSplitSchema = z.object({
+  splitIndex: z.number().int().min(0),
+  flavorProductId: z.string().cuid(),
 });
 
 // ─── Orders ──────────────────────────────────────────────────
@@ -54,6 +139,8 @@ export const orderItemSchema = z.object({
   productId: z.string().cuid(),
   quantity: z.number().int().positive(),
   notes: z.string().optional(),
+  selectedOptions: z.array(orderSelectedOptionSchema).default([]),
+  splits: z.array(orderSplitSchema).default([]),
   addons: z
     .array(
       z.object({
@@ -66,11 +153,17 @@ export const orderItemSchema = z.object({
 
 export const createOrderSchema = z.object({
   type: z.enum(["DINE_IN", "TAKEOUT", "DELIVERY"]),
+  paymentMethod: z.enum(["CASH", "PIX", "CREDIT_CARD", "DEBIT_CARD", "VOUCHER"]).optional(),
+  tabId: z.string().cuid().optional(),
   tableNumber: z.string().optional(),
   customerId: z.string().cuid().optional(),
+  customerName: z.string().optional(),
+  customerPhone: z.string().optional(),
+  customerEmail: z.string().email().optional().or(z.literal("")),
   items: z.array(orderItemSchema).min(1, "Ao menos 1 item obrigatório"),
   notes: z.string().optional(),
   couponCode: z.string().optional(),
+  deliveryFee: z.number().min(0).optional(),
   deliveryAddress: z
     .object({
       street: z.string(),
@@ -78,6 +171,8 @@ export const createOrderSchema = z.object({
       complement: z.string().optional(),
       neighborhood: z.string(),
       city: z.string(),
+      state: z.string().length(2).optional(),
+      zipCode: z.string().optional(),
     })
     .optional(),
 });
@@ -140,4 +235,44 @@ export const createCouponSchema = z.object({
   maxUses: z.number().int().positive().optional(),
   isFirstOrderOnly: z.boolean().default(false),
   expiresAt: z.string().datetime().optional(),
+});
+
+// ─── Tables ──────────────────────────────────────────────────
+
+export const createTableSchema = z.object({
+  identifier: z.string().min(1, "Identificador obrigatório").max(50),
+  capacity: z.number().int().positive().optional(),
+  isActive: z.boolean().default(true),
+});
+
+export const updateTableSchema = createTableSchema.partial();
+
+// ─── Tabs (Comandas) ─────────────────────────────────────────
+
+export const createTabSchema = z
+  .object({
+    tableId: z.string().cuid().optional(),
+    customerId: z.string().cuid().optional(),
+    guestCustomerName: z.string().min(1).max(100).optional(), // Cliente avulso
+    notes: z.string().max(500).optional(),
+  })
+  .refine((data) => data.tableId || data.customerId || data.guestCustomerName, {
+    message: "Comanda deve ter mesa, cliente cadastrado OU nome de cliente avulso",
+  })
+  .refine(
+    (data) => {
+      const count = [data.tableId, data.customerId, data.guestCustomerName].filter(Boolean).length;
+      return count <= 1;
+    },
+    {
+      message: "Comanda não pode ter mais de um tipo (mesa, cliente ou avulso) ao mesmo tempo",
+    }
+  );
+
+export const closeTabSchema = z.object({
+  paymentMethod: z.enum(["CASH", "CREDIT_CARD", "DEBIT_CARD", "PIX", "VOUCHER"]),
+  discount: z.number().nonnegative().default(0),
+  serviceCharge: z.number().nonnegative().default(0),
+  coverCharge: z.number().nonnegative().default(0),
+  notes: z.string().max(500).optional(),
 });

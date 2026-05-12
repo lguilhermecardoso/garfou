@@ -31,6 +31,15 @@ export async function GET(req: NextRequest, { params }: Params) {
         quantity: item.quantity,
         price: Number(item.unitPrice),
         notes: item.notes,
+        splits: item.splits.map((split) => ({
+          splitIndex: split.splitIndex,
+          productName: split.productName,
+        })),
+        selectedOptions: item.selectedOptions.map((selection) => ({
+          optionName: selection.optionName,
+          quantity: selection.quantity,
+          isRemoval: selection.isRemoval,
+        })),
         addons: item.addons.map((a) => ({
           name: a.addon.name,
           quantity: a.quantity,

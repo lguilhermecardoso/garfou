@@ -54,6 +54,8 @@
  * ═══════════════════════════════════════════════════════════════
  */
 
+require("dotenv").config();
+
 const { PrismaPg } = require("@prisma/adapter-pg");
 const {
   PrismaClient,
@@ -159,6 +161,7 @@ async function main() {
       stripeSubscriptionId: "sub_demo_garfou_enterprise",
       trialEndsAt: new Date("2027-01-01T00:00:00.000Z"),
       settings: {
+        plan: "ENTERPRISE", // Plano Enterprise permite múltiplos restaurantes
         approvalMode: "MANUAL",
         autoPrint: true,
         kitchenPollingSeconds: 3,
@@ -599,6 +602,37 @@ async function main() {
     ],
   });
 
+  // ── Cash Register ────────────────────────────────────────────────
+  // Caixa aberto hoje com R$200,00 inicial
+  const cashRegister = await prisma.cashRegister.create({
+    data: {
+      restaurantId: rId,
+      userId: users.cashier.id,
+      openedAt: daysAgo(0),
+      initialAmount: 200.0,
+      status: "OPEN",
+      openNotes: "Troco inicial do dia",
+    },
+  });
+
+  // Transações de vendas (simulando vendas do dia)
+  await prisma.cashTransaction.createMany({
+    data: [
+      { registerId: cashRegister.id, type: "SALE", amount: 85.0, paymentMethod: PaymentMethod.CASH, description: "Venda balcão", userId: users.cashier.id, createdAt: daysAgo(0) },
+      { registerId: cashRegister.id, type: "SALE", amount: 120.5, paymentMethod: PaymentMethod.PIX, description: "Venda delivery", userId: users.cashier.id, createdAt: daysAgo(0) },
+      { registerId: cashRegister.id, type: "SALE", amount: 45.0, paymentMethod: PaymentMethod.CASH, description: "Venda balcão", userId: users.cashier.id, createdAt: daysAgo(0) },
+      { registerId: cashRegister.id, type: "SALE", amount: 95.0, paymentMethod: PaymentMethod.DEBIT_CARD, description: "Venda mesa 5", userId: users.cashier.id, createdAt: daysAgo(0) },
+      { registerId: cashRegister.id, type: "SALE", amount: 150.0, paymentMethod: PaymentMethod.CREDIT_CARD, description: "Venda mesa 3", userId: users.cashier.id, createdAt: daysAgo(0) },
+      // Sangria
+      { registerId: cashRegister.id, type: "WITHDRAWAL", amount: 100.0, paymentMethod: PaymentMethod.CASH, description: "Depósito bancário", userId: users.manager.id, createdAt: daysAgo(0) },
+      // Suprimento
+      { registerId: cashRegister.id, type: "SUPPLY", amount: 50.0, paymentMethod: PaymentMethod.CASH, description: "Reforço de troco", userId: users.cashier.id, createdAt: daysAgo(0) },
+      // Mais vendas
+      { registerId: cashRegister.id, type: "SALE", amount: 75.0, paymentMethod: PaymentMethod.PIX, description: "Venda delivery", userId: users.cashier.id, createdAt: daysAgo(0) },
+      { registerId: cashRegister.id, type: "SALE", amount: 60.0, paymentMethod: PaymentMethod.CASH, description: "Venda balcão", userId: users.cashier.id, createdAt: daysAgo(0) },
+    ],
+  });
+
   // ── Customer totals (calculados manualmente do histórico) ────────
   await Promise.all([
     prisma.customer.update({ where: { id: c1.id }, data: { totalOrders: 3, totalSpent: 284.4 } }),
@@ -622,6 +656,7 @@ async function main() {
   console.log("  kitchen@garfou.demo / Kitchen123!");
   console.log("  cashier@garfou.demo / Cashier123!");
   console.log("[seed] pedidos: 15 (todos os status representados)");
+  console.log("[seed] caixa: 1 aberto com R$200 inicial + 9 transações");
   console.log("[seed] estoque: 2 itens abaixo do minimo (alertas)");
   console.log("[seed] NPS: 10 respostas (3 detratores · 4 passivos · 3 promotores)");
 }

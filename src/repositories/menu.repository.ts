@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { productCustomizationInclude } from "@/features/menu/product-customization.server";
 
 export const menuRepository = {
   async getCategories(restaurantId: string, includeInactive = false) {
@@ -14,9 +15,7 @@ export const menuRepository = {
             deletedAt: null,
             ...(includeInactive ? {} : { isActive: true }),
           },
-          include: {
-            addons: true,
-          },
+          include: productCustomizationInclude,
           orderBy: { sortOrder: "asc" },
         },
       },
@@ -27,7 +26,7 @@ export const menuRepository = {
   async findProductById(restaurantId: string, productId: string) {
     return prisma.product.findFirst({
       where: { id: productId, restaurantId, deletedAt: null },
-      include: { addons: true, category: true },
+      include: { ...productCustomizationInclude, category: true },
     });
   },
 
@@ -39,7 +38,7 @@ export const menuRepository = {
         isActive: true,
         deletedAt: null,
       },
-      include: { addons: true },
+      include: productCustomizationInclude,
     });
   },
 };

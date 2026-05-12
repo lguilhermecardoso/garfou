@@ -1,5 +1,4 @@
 import NextAuth from "next-auth";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import { skipCSRFCheck } from "@auth/core";
 import { prisma } from "@/lib/db";
@@ -20,7 +19,6 @@ export const {
 } = NextAuth({
   ...authConfig,
   skipCSRFCheck,
-  adapter: PrismaAdapter(prisma),
   providers: [
     ...authConfig.providers,
     Credentials({
@@ -54,6 +52,7 @@ export const {
             return null;
           }
 
+          console.log("[auth] login successful for:", email, "id:", user.id);
           return { id: user.id, name: user.name, email: user.email, image: user.image };
         } catch (err) {
           console.error("[auth] authorize exception:", err);

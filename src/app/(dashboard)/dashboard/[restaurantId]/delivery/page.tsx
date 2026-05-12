@@ -21,6 +21,11 @@ export default async function DeliveryPage({ params }: Props) {
     orderBy: { name: "asc" },
   });
 
+  const initialZones = zones.map((zone) => ({
+    ...zone,
+    fee: Number(zone.fee),
+  }));
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -32,7 +37,7 @@ export default async function DeliveryPage({ params }: Props) {
         </div>
       </div>
 
-      <DeliveryZonesClient restaurantId={restaurantId} initialZones={zones} />
+      <DeliveryZonesClient restaurantId={restaurantId} initialZones={initialZones} />
     </div>
   );
 }

@@ -1,6 +1,12 @@
 // Global TypeScript types for GARFOU
 
-import type { UserRole, OrderStatus, OrderType, PaymentMethod, PaymentStatus } from "@prisma/client";
+import type {
+  UserRole,
+  OrderStatus,
+  OrderType,
+  PaymentMethod,
+  PaymentStatus,
+} from "@prisma/client";
 
 // ─── Auth ─────────────────────────────────────────────────────
 
@@ -109,7 +115,39 @@ export interface MenuProduct {
   price: number;
   image: string | null;
   isFeatured: boolean;
+  allowCustomization: boolean;
+  allowSplit: boolean;
+  maxSplits: 2 | 3 | 4;
+  splitPriceRule: "HIGHEST" | "AVERAGE" | "SUM";
   preparationTime: number | null;
+  modifierGroups: {
+    id: string;
+    name: string;
+    type: "INGREDIENT" | "ADDON" | "REQUIRED_CHOICE" | "REQUIRED_MULTI";
+    minSelections: number;
+    maxSelections: number;
+    sortOrder: number;
+    options: {
+      id: string;
+      name: string;
+      price: number;
+      isDefault: boolean;
+      isAvailable: boolean;
+      sortOrder: number;
+    }[];
+  }[];
+  splitFlavors: {
+    id: string;
+    flavorProductId: string;
+    sortOrder: number;
+    isAvailable: boolean;
+    flavorProduct: {
+      id: string;
+      name: string;
+      price: number;
+      isActive: boolean;
+    };
+  }[];
   addons: {
     id: string;
     name: string;

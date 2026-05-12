@@ -25,11 +25,24 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 import { OrderPrintReceipt, printOrder } from "./order-print-receipt";
 import type { PrintOrder } from "./order-print-receipt";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { formatCurrency } from "@/lib/utils";
-import { CheckCircle, XCircle, Printer, X, RefreshCw, AlertCircle } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  Printer,
+  X,
+  RefreshCw,
+  AlertCircle,
+  CheckCheck,
+  Truck,
+} from "lucide-react";
+import { PrintConfirmationModal } from "@/components/shared/print-confirmation-modal";
+import { usePrintConfirmation } from "@/hooks/use-print-confirmation";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -42,16 +55,22 @@ interface Props {
 }
 
 const PENDING_STATUSES = new Set(["NOVO_PEDIDO", "AGUARDANDO_CONFIRMACAO"]);
+const READY_STATUS = "PRONTO";
+const OUT_FOR_DELIVERY_STATUS = "SAIU_PARA_ENTREGA";
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChange }: Props) {
+  const queryClient = useQueryClient();
   const [order, setOrder] = useState<(PrintOrder & { id: string; status: string }) | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [actioning, setActioning] = useState<"confirm" | "cancel" | null>(null);
+  const [actioning, setActioning] = useState<
+    "confirm" | "cancel" | "finalize" | "out_for_delivery" | null
+  >(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const printConfirmation = usePrintConfirmation();
 
   // Fetch order details
   const fetchOrder = useCallback(async () => {
@@ -110,7 +129,10 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
-  async function patchStatus(newStatus: string, kind: "confirm" | "cancel") {
+  async function patchStatus(
+    newStatus: string,
+    kind: "confirm" | "cancel" | "finalize" | "out_for_delivery"
+  ) {
     if (!order) return;
     setActioning(kind);
     try {
@@ -120,21 +142,59 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
         body: JSON.stringify({ status: newStatus }),
       });
       if (!res.ok) throw new Error("Falha ao atualizar status");
+
       setOrder((prev) => (prev ? { ...prev, status: newStatus } : prev));
       onStatusChange?.(order.id, newStatus);
 
-      // Auto-print on confirm
+      // Invalidate queries to refresh tabs and orders lists
+      queryClient.invalidateQueries({ queryKey: ["pos-tabs", restaurantId] });
+      queryClient.invalidateQueries({ queryKey: ["pos-tab-detail", restaurantId] });
+
+      // Show success toast
+      if (kind === "confirm") {
+        toast.success("Pedido confirmado!", {
+          description: `#${order.orderNumber} confirmado e enviado para impressão`,
+        });
+      } else if (kind === "cancel") {
+        toast.success("Pedido cancelado", {
+          description: `#${order.orderNumber} foi cancelado`,
+        });
+      } else if (kind === "finalize") {
+        toast.success("Pedido finalizado!", {
+          description: `#${order.orderNumber} foi finalizado`,
+        });
+      } else if (kind === "out_for_delivery") {
+        toast.success("Saiu para entrega!", {
+          description: `#${order.orderNumber} está a caminho`,
+        });
+      }
+
+      // Auto-print on confirm with confirmation modal
       if (kind === "confirm" && order) {
-        printOrder({ ...order, status: newStatus });
+        printConfirmation.startPrint(() => printOrder({ ...order, status: newStatus }));
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao atualizar");
+      const errorMsg = err instanceof Error ? err.message : "Erro ao atualizar";
+      setError(errorMsg);
+
+      let toastTitle = "Erro ao atualizar pedido";
+      if (kind === "confirm") toastTitle = "Erro ao confirmar pedido";
+      else if (kind === "cancel") toastTitle = "Erro ao cancelar pedido";
+      else if (kind === "finalize") toastTitle = "Erro ao finalizar pedido";
+      else if (kind === "out_for_delivery") toastTitle = "Erro ao marcar como saiu para entrega";
+
+      toast.error(toastTitle, {
+        description: errorMsg,
+      });
     } finally {
       setActioning(null);
     }
   }
 
   const isPending = order ? PENDING_STATUSES.has(order.status) : false;
+  const isReady = order?.status === READY_STATUS;
+  const isOutForDelivery = order?.status === OUT_FOR_DELIVERY_STATUS;
+  const isDelivery = order?.type === "DELIVERY";
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -204,7 +264,7 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
             <div className="flex justify-end gap-2">
               {/* Print — always available */}
               <button
-                onClick={() => printOrder(order)}
+                onClick={() => printConfirmation.startPrint(() => printOrder(order))}
                 className="flex items-center gap-2 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
               >
                 <Printer className="h-4 w-4" aria-hidden="true" />
@@ -241,6 +301,38 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
                   </button>
                 </>
               )}
+
+              {/* Out for delivery — only for ready delivery orders */}
+              {isReady && isDelivery && (
+                <button
+                  onClick={() => patchStatus("SAIU_PARA_ENTREGA", "out_for_delivery")}
+                  disabled={!!actioning}
+                  className="flex items-center gap-2 rounded-xl bg-blue-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-600 disabled:opacity-50"
+                >
+                  {actioning === "out_for_delivery" ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <Truck className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Saiu para Entrega
+                </button>
+              )}
+
+              {/* Finalize — for ready non-delivery orders or out for delivery */}
+              {((isReady && !isDelivery) || isOutForDelivery) && (
+                <button
+                  onClick={() => patchStatus("FINALIZADO", "finalize")}
+                  disabled={!!actioning}
+                  className="flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-600 disabled:opacity-50"
+                >
+                  {actioning === "finalize" ? (
+                    <RefreshCw className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <CheckCheck className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Finalizar
+                </button>
+              )}
             </div>
 
             {/* Summary row */}
@@ -255,6 +347,14 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
           </div>
         )}
       </div>
+
+      {/* Print Confirmation Modal */}
+      <PrintConfirmationModal
+        open={printConfirmation.isOpen}
+        onOpenChange={printConfirmation.handleCancel}
+        onConfirm={printConfirmation.handleConfirm}
+        onRetry={printConfirmation.handleRetry}
+      />
     </div>
   );
 }

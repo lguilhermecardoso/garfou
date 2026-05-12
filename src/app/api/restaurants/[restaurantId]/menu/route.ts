@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { menuRepository } from "@/repositories/menu.repository";
 import { auth } from "@/lib/auth";
 import { requireRole } from "@/lib/rbac";
+import { serializeProductWithCustomization } from "@/features/menu/product-customization.server";
 
 interface Params {
   params: Promise<{ restaurantId: string }>;
@@ -25,18 +26,25 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     // Internal-only products are hidden from public menu
-    const categories = await menuRepository.getCategories(restaurantId, !isPublic && includeInactive);
+    const categories = await menuRepository.getCategories(
+      restaurantId,
+      !isPublic && includeInactive
+    );
+    const serializedCategories = categories.map((category) => ({
+      ...category,
+      products: category.products.map(serializeProductWithCustomization),
+    }));
 
     if (isPublic) {
       // Filter internal-only products for public menu
-      const publicCategories = categories.map((cat) => ({
+      const publicCategories = serializedCategories.map((cat) => ({
         ...cat,
         products: cat.products.filter((p) => !p.isInternalOnly),
       }));
       return NextResponse.json({ data: publicCategories });
     }
 
-    return NextResponse.json({ data: categories });
+    return NextResponse.json({ data: serializedCategories });
   } catch (error) {
     console.error("[MENU GET]", error);
     return NextResponse.json({ error: "Erro interno" }, { status: 500 });

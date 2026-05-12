@@ -25,6 +25,8 @@ export const authConfig: NextAuthConfig = {
         "/",
         "/auth/signin",
         "/auth/signup",
+        "/auth/signout",
+        "/auth/after-login",
         "/auth/error",
         "/manifest.json",
         "/sw.js",

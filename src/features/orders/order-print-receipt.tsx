@@ -30,12 +30,26 @@ export interface PrintAddon {
   unitPrice: number;
 }
 
+export interface PrintSelectedOption {
+  optionName: string;
+  quantity: number;
+  unitPrice: number;
+  isRemoval: boolean;
+}
+
+export interface PrintSplit {
+  splitIndex: number;
+  productName: string;
+}
+
 export interface PrintItem {
   quantity: number;
   product: { name: string };
   unitPrice: number;
   notes?: string | null;
   addons?: PrintAddon[];
+  selectedOptions?: PrintSelectedOption[];
+  splits?: PrintSplit[];
 }
 
 export interface PrintOrder {
@@ -51,6 +65,7 @@ export interface PrintOrder {
   paymentMethod: string | null;
   notes?: string | null;
   customer?: { name: string; phone?: string | null } | null;
+  tab?: { guestCustomerName?: string | null } | null;
   deliveryAddress?: {
     street?: string;
     number?: string;
@@ -121,30 +136,52 @@ export function buildReceiptLines(order: PrintOrder): string[] {
   const dateStr = createdAt.toLocaleDateString("pt-BR");
   const timeStr = createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 
+  // Determine customer/table label
+  let customerLabel = "";
+  if (order.tableNumber) {
+    customerLabel = `MESA ${order.tableNumber}`;
+  } else if (order.customer?.name) {
+    customerLabel = order.customer.name;
+  } else if (order.tab?.guestCustomerName) {
+    customerLabel = order.tab.guestCustomerName;
+  }
+
   add(
     line("═"),
     center("GARFOU"),
     center("Sistema de Gestao de Pedidos"),
     line("─"),
     center(`PEDIDO #${order.orderNumber}`),
-    center(
-      `${TYPE_LABELS[order.type] ?? order.type}${order.tableNumber ? ` - MESA ${order.tableNumber}` : ""}`
-    ),
+    center(`*** ${TYPE_LABELS[order.type] ?? order.type} ***`),
+    ...(customerLabel ? [center(customerLabel)] : []),
     line("─"),
     leftRight(`Data: ${dateStr}`, `Hora: ${timeStr}`)
   );
 
+  // Customer information (always show if available)
   if (order.customer) {
     add(
-      `Cliente: ${order.customer.name}`,
-      ...(order.customer.phone ? [`Tel: ${order.customer.phone}`] : [])
+      line("─"),
+      `CLIENTE: ${order.customer.name}`,
+      ...(order.customer.phone ? [`TELEFONE: ${order.customer.phone}`] : [])
     );
   }
 
+  // Delivery address (only for delivery orders)
   if (order.type === "DELIVERY" && order.deliveryAddress) {
     const addr = order.deliveryAddress;
-    const addrLine = [addr.street, addr.number, addr.district].filter(Boolean).join(", ");
-    if (addrLine) add(...wrap(`Entrega: ${addrLine}`));
+    add(line("─"));
+    if (addr.street && addr.number) {
+      add(...wrap(`ENDERECO: ${addr.street}, ${addr.number}`, 0));
+    }
+    if (addr.district) {
+      add(`BAIRRO: ${addr.district}`);
+    }
+    if (addr.city && addr.state) {
+      add(`CIDADE: ${addr.city}/${addr.state}`);
+    } else if (addr.city) {
+      add(`CIDADE: ${addr.city}`);
+    }
   }
 
   add(line("─"), center("ITENS"), line("─"));
@@ -161,6 +198,21 @@ export function buildReceiptLines(order: PrintOrder): string[] {
       );
     }
     add(`   Un: ${formatCurrency(item.unitPrice)}`);
+    if (item.splits?.length) {
+      const denominator = item.splits.length;
+      for (const split of item.splits) {
+        add(...wrap(`  ${1}/${denominator} ${split.productName}`, 2));
+      }
+    }
+    if (item.selectedOptions?.length) {
+      for (const selection of item.selectedOptions) {
+        const prefix = selection.isRemoval ? "  - " : "  + ";
+        const priceLabel = selection.isRemoval
+          ? ""
+          : `  ${formatCurrency(selection.unitPrice * selection.quantity)}`;
+        add(...wrap(`${prefix}${selection.quantity}x ${selection.optionName}${priceLabel}`, 2));
+      }
+    }
     if (item.notes) add(...wrap(`* ${item.notes}`, 3));
     if (item.addons?.length) {
       for (const addon of item.addons) {
@@ -249,6 +301,7 @@ export function printOrder(order: PrintOrder): void {
   doc.write(html);
   doc.close();
 
+  // Print
   iframe.contentWindow?.focus();
   iframe.contentWindow?.print();
 

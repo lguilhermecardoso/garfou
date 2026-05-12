@@ -1,9 +1,25 @@
 # GARFOU — Feature: Personalização de Itens do Cardápio
 
-> **Status:** `SPEC — Aguardando implementação`
+> **Status:** `IMPLEMENTADO — Primeira versão operacional`
 > **Última atualização:** 2026-05-12
 > **Autor:** Análise de produto + arquitetura Garfou
 > **Escopo:** Cardápio Digital (cliente) + Gestão de Cardápio (operador)
+
+## Status de Implementação
+
+Implementado nesta primeira versão:
+
+- Modelo persistente com `modifier_groups`, `modifier_options`, `product_split_flavors` e `order_item_splits`
+- Configuração no gestor dentro de `menu-management.tsx` via `ProductCustomizationPanel`
+- Seleção no cardápio digital via `ProductDetailSheet`, `ModifierGroupSection` e `SplitSelector`
+- Criação de pedido com `selectedOptions[]` e `splits[]`
+- Recibo térmico com linhas de divisão e opções selecionadas
+
+Ainda pendente nesta iteração:
+
+- Rotas CRUD dedicadas para grupos/opções/sabores fora do modal de produto
+- Exibição enriquecida na tela de cozinha
+- Cobertura automatizada específica para o novo fluxo
 
 ---
 
@@ -181,14 +197,14 @@ model ProductAddon {
 
 ### 3.2 O que já existe na API
 
-| Rota                                        | Situação                                 |
-| ------------------------------------------- | ---------------------------------------- |
-| `GET /api/restaurants/:rId/products`        | Inclui `addons[]` no retorno             |
-| `GET /api/restaurants/:rId/products/:pId`   | Inclui `addons[]`                        |
-| `POST /api/restaurants/:rId/products`       | Não persiste addons                      |
-| `PATCH /api/restaurants/:rId/products/:pId` | Não persiste addons                      |
-| `GET /api/restaurants/:rId/menu`            | **Não inclui addons** no retorno público |
-| Rotas de addons (`/addons/*`)               | **Não existem**                          |
+| Rota                                        | Situação                                                |
+| ------------------------------------------- | ------------------------------------------------------- |
+| `GET /api/restaurants/:rId/products`        | Inclui `addons[]`, `modifierGroups[]`, `splitFlavors[]` |
+| `GET /api/restaurants/:rId/products/:pId`   | Inclui configuração completa de customização            |
+| `POST /api/restaurants/:rId/products`       | Persiste produto + grupos + sabores de divisão          |
+| `PATCH /api/restaurants/:rId/products/:pId` | Atualiza produto + grupos + sabores de divisão          |
+| `GET /api/restaurants/:rId/menu`            | Expõe customização estruturada no menu público          |
+| Rotas de addons (`/addons/*`)               | Ainda não existem como CRUD dedicado                    |
 
 ### 3.3 O que já existe nos componentes
 
@@ -1109,6 +1125,11 @@ interface ModifierOption {
    independente de `product.allowCustomization`.
 2. `product.allowCustomization` só tem efeito se o toggle de restaurante estiver habilitado.
 3. Produtos `isInternalOnly: true` seguem as mesmas regras de personalização.
+4. Quando `allowSplit = true`, o produto passa a usar preço calculado pelos sabores e deixa de usar preço fixo de catálogo.
+5. Para compatibilidade com o schema atual, produtos divisíveis são persistidos com `price = 0`, mas esse valor é apenas técnico e não representa o preço de venda.
+6. Em produtos divisíveis, a regra de preço do item fica exclusivamente em `splitPriceRule`:
+   `HIGHEST` (mais caro), `AVERAGE` (média) ou `SUM` (soma).
+7. O operador não precisa cadastrar preço fixo para pizza/calzone dividido; o preço base do item vem dos sabores escolhidos.
 
 ### 9.2 Validação de pedido
 
@@ -1160,6 +1181,17 @@ interface ModifierOption {
 26. `OrderItemSplit` registros são imutáveis após criação (snapshot histórico).
 27. Ao excluir um produto do catálogo (soft delete), o produto continua acessível via
     `order_item_splits.productId` para histórico, mas deve ser removido do pool de
+
+### 9.8 Exemplos de cálculo para produtos divisíveis
+
+28. Pizza grande 2 sabores, regra `HIGHEST`, sabores `Calabresa R$ 50` + `Frango R$ 60`:
+    base do item = `R$ 60`.
+29. Pizza grande 2 sabores, regra `AVERAGE`, sabores `Calabresa R$ 50` + `Frango R$ 60`:
+    base do item = `R$ 55`.
+30. Pizza grande 2 sabores, regra `SUM`, sabores `Calabresa R$ 50` + `Frango R$ 60`:
+    base do item = `R$ 110`.
+31. Modificadores pagos entram depois da regra da divisão. Ex.: `HIGHEST` (`R$ 60`) + extra queijo
+    (`R$ 8`) = `R$ 68` por unidade.
     `product_split_flavors` de outros produtos.
 
 ---

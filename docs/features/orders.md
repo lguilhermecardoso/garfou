@@ -39,9 +39,10 @@ At any point → CANCELADO
 1. Orders can be created by: waiters, customers (digital menu), cashiers
 2. `orderNumber` is auto-incremented PER restaurant (not global)
 3. Product prices are **snapshotted** at order creation time (not live price)
-4. Discount/coupon is applied at order level, not item level
-5. Kitchen only sees orders in: `CONFIRMADO`, `EM_PREPARO` status
-6. Waiter app shows all non-cancelled orders for current session
+4. Modifier options and split flavors are also snapshotted at order creation time
+5. Discount/coupon is applied at order level, not item level
+6. Kitchen only sees orders in: `CONFIRMADO`, `EM_PREPARO` status
+7. Waiter app shows all non-cancelled orders for current session
 
 ## Auto-Approval
 
@@ -59,6 +60,9 @@ Restaurants can configure `settings.autoApproveOrders = true`.
 - Plays a doorbell sound when new NOVO_PEDIDO/AGUARDANDO_CONFIRMACAO orders appear
 - **Eye button** on every row → opens `OrderDetailModal`
 - **Inline ✅/❌ buttons** on `NOVO_PEDIDO` / `AGUARDANDO_CONFIRMACAO` rows for quick approve/reject
+- **🚚 Truck button** on `PRONTO` + `DELIVERY` rows → marks as `SAIU_PARA_ENTREGA`
+- **✅ Finalize button** on `PRONTO` (non-delivery) or `SAIU_PARA_ENTREGA` rows → marks as `FINALIZADO`
+- Row highlighting: pending (amber), ready (emerald), out for delivery (blue)
 - Props: `{ restaurantId: string, initialStatus?: string }`
 
 ### OrderDetailModal (`src/features/orders/order-detail-modal.tsx`)
@@ -68,6 +72,8 @@ Restaurants can configure `settings.autoApproveOrders = true`.
 - Renders `<OrderPrintReceipt>` preview inside
 - **Confirmar e Imprimir** button: PATCH status → `CONFIRMADO` then auto-calls `printOrder()`
 - **Recusar** button: PATCH status → `CANCELADO`
+- **Saiu para Entrega** button (🚚): Only for `PRONTO` + `DELIVERY` orders → `SAIU_PARA_ENTREGA`
+- **Finalizar** button (✅): For `PRONTO` (non-delivery) or `SAIU_PARA_ENTREGA` → `FINALIZADO`
 - **Imprimir** button: always available, calls `printOrder()`
 - `onStatusChange(orderId, newStatus)` callback — parent updates its local state, no full refetch
 - Props: `{ orderId: string | null, restaurantId: string, onClose(): void, onStatusChange?(id, status): void }`
@@ -81,6 +87,7 @@ Restaurants can configure `settings.autoApproveOrders = true`.
 - `OrderPrintReceipt({ order, className })` — monospaced scroll preview, max-height 60vh
 - `PrintOrder` interface includes: orderNumber, createdAt, type, tableNumber, status, subtotal,
   discount, deliveryFee, total, paymentMethod, notes, customer, deliveryAddress, items
+- `PrintItem` now supports `selectedOptions[]` and `splits[]` to render customizations and divided products
 
 ### DashboardPendingOrders (`src/features/orders/dashboard-pending-orders.tsx`)
 
@@ -114,21 +121,21 @@ See [printing architecture](../printing/architecture.md).
 
 ## API Endpoints
 
-| Method | Route                                                            | Description                                             |
-| ------ | ---------------------------------------------------------------- | ------------------------------------------------------- |
-| GET    | `/api/restaurants/[restaurantId]/orders`                         | List orders; query params: `status`, `page`, `pageSize` |
-| POST   | `/api/restaurants/[restaurantId]/orders`                         | Create new order                                        |
-| GET    | `/api/restaurants/[restaurantId]/orders/[orderId]`               | Get full order (customer, items, addons)                |
-| PATCH  | `/api/restaurants/[restaurantId]/orders/[orderId]`               | Update status (`updateOrderStatusSchema`)               |
-| GET    | `/api/restaurants/[restaurantId]/orders/print-queue`             | Print Agent polling endpoint                            |
-| POST   | `/api/restaurants/[restaurantId]/orders/[orderId]/confirm-print` | Mark as printed                                         |
+| Method | Route                                                            | Description                                                       |
+| ------ | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
+| GET    | `/api/restaurants/[restaurantId]/orders`                         | List orders; query params: `status`, `page`, `pageSize`           |
+| POST   | `/api/restaurants/[restaurantId]/orders`                         | Create new order with addons, selectedOptions, splits             |
+| GET    | `/api/restaurants/[restaurantId]/orders/[orderId]`               | Get full order (customer, items, addons, selectedOptions, splits) |
+| PATCH  | `/api/restaurants/[restaurantId]/orders/[orderId]`               | Update status (`updateOrderStatusSchema`)                         |
+| GET    | `/api/restaurants/[restaurantId]/orders/print-queue`             | Print Agent polling endpoint                                      |
+| POST   | `/api/restaurants/[restaurantId]/orders/[orderId]/confirm-print` | Mark as printed                                                   |
 
 ## Repository Shape
 
 `order.repository.ts`:
 
 - `findMany()` returns `{ orders, total, page, pageSize }` — `orders[]` includes full `items[]` array
-- `findById()` returns order with `customer`, `waiter`, `items` (each with `product` + `addons`)
+- `findById()` returns order with `customer`, `waiter`, `items` (each with `product`, `addons`, `selectedOptions`, `splits`)
 - `findPrintQueue()` returns orders where `printConfirmed: false` and status in `[CONFIRMADO, EM_PREPARO]`
 
 ## Seed Data

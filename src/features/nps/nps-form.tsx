@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { UtensilsCrossed, Star } from "lucide-react";
 
@@ -21,14 +22,22 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
     if (score === null) return;
     setLoading(true);
     try {
-      await fetch(`/api/restaurants/${restaurantId}/nps`, {
+      const response = await fetch(`/api/restaurants/${restaurantId}/nps`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ score, comment, orderId }),
       });
-      setSubmitted(true);
+
+      if (response.ok) {
+        setSubmitted(true);
+        toast.success("Avaliação enviada com sucesso!", {
+          description: "Obrigado pelo seu feedback!",
+        });
+      } else {
+        toast.error("Erro ao enviar avaliação.");
+      }
     } catch {
-      alert("Erro ao enviar avaliação.");
+      toast.error("Erro ao enviar avaliação.");
     } finally {
       setLoading(false);
     }
@@ -37,8 +46,8 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
   if (submitted) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-50 px-4 text-center">
-        <div className="rounded-full bg-accent-100 p-6">
-          <Star className="h-12 w-12 text-accent-500" aria-hidden="true" />
+        <div className="bg-accent-100 rounded-full p-6">
+          <Star className="text-accent-500 h-12 w-12" aria-hidden="true" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Obrigado!</h1>
@@ -66,10 +75,10 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col bg-neutral-50">
-      <header className="bg-white border-b border-neutral-100 px-4 py-4">
+      <header className="border-b border-neutral-100 bg-white px-4 py-4">
         <div className="mx-auto flex max-w-lg items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
-            <UtensilsCrossed className="h-5 w-5 text-primary-500" aria-hidden="true" />
+          <div className="bg-primary-100 flex h-10 w-10 items-center justify-center rounded-xl">
+            <UtensilsCrossed className="text-primary-500 h-5 w-5" aria-hidden="true" />
           </div>
           <div>
             <p className="font-bold text-neutral-900">{restaurantName}</p>
@@ -81,12 +90,8 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
       <main className="flex-1 px-4 py-8" id="main-content">
         <form onSubmit={handleSubmit} className="mx-auto max-w-lg space-y-8">
           <div className="text-center">
-            <h1 className="text-xl font-bold text-neutral-900">
-              Como foi sua experiência?
-            </h1>
-            <p className="mt-1 text-neutral-500">
-              0 = péssimo, 10 = incrível
-            </p>
+            <h1 className="text-xl font-bold text-neutral-900">Como foi sua experiência?</h1>
+            <p className="mt-1 text-neutral-500">0 = péssimo, 10 = incrível</p>
           </div>
 
           {/* Score buttons */}
@@ -97,14 +102,15 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
                   key={i}
                   type="button"
                   onClick={() => setScore(i)}
-                  className={`aspect-square rounded-xl text-sm font-bold transition-all ${score === i
-                      ? "bg-primary-500 text-white scale-110 shadow-md"
+                  className={`aspect-square rounded-xl text-sm font-bold transition-all ${
+                    score === i
+                      ? "bg-primary-500 scale-110 text-white shadow-md"
                       : i <= 6
                         ? "bg-red-50 text-red-600 hover:bg-red-100"
                         : i <= 8
                           ? "bg-yellow-50 text-yellow-700 hover:bg-yellow-100"
                           : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
-                    }`}
+                  }`}
                   aria-pressed={score === i}
                   aria-label={`Nota ${i}`}
                 >
@@ -130,7 +136,7 @@ export function NpsForm({ restaurantId, restaurantName, orderId }: Props) {
               placeholder="O que você mais gostou? O que podemos melhorar?"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+              className="focus:ring-primary-400 w-full resize-none rounded-xl border border-neutral-200 px-4 py-3 text-sm focus:ring-2 focus:outline-none"
               maxLength={500}
             />
             <p className="text-right text-xs text-neutral-400">{comment.length}/500</p>

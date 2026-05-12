@@ -7,6 +7,7 @@
 - [ ] Implement WhatsApp flow helpers (wa.me links by order status + NPS trigger path)
 - [ ] Stabilize Playwright critical E2E flow: signup -> onboarding -> order -> kitchen -> finalized
 - [ ] Expand E2E to waiter and kitchen core workflows
+- [ ] Add automated coverage for menu customization and split-product ordering flows
 - [ ] Increase order service coverage from 76% to >= 90%
 - [ ] Increase utils coverage from 60% to >= 80%
 - [ ] Complete delivery rules (zones/radius/fee) end-to-end UX + API checks
@@ -35,6 +36,7 @@
 - [x] Wire OrderDetailModal into OrdersLiveTable (Eye button on all rows)
 - [x] Implement DashboardPendingOrders live widget (dashboard-pending-orders.tsx) - Replaces static "Pedidos recentes" card, polls every 8s, eye + confirm quick-actions
 - [x] Update dashboard page to use DashboardPendingOrders widget
+- [x] Implement menu item customization and split-product flow across manager, public menu, order API, and receipt rendering
 
 ## Rules to keep this file useful
 

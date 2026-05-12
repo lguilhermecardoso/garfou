@@ -1,21 +1,35 @@
+/**
+ * MenuManagement
+ *
+ * Manager-side cardápio control panel with category CRUD, product CRUD, and
+ * product customization configuration for modifiers and split flavors.
+ */
+
 "use client";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { formatCurrency } from "@/lib/utils";
+import { toast } from "sonner";
 import {
-  Plus,
-  Pencil,
-  Trash2,
   ChevronDown,
   ChevronRight,
-  PackageX,
-  Star,
   EyeOff,
+  PackageX,
+  Pencil,
+  Plus,
+  Split,
+  Star,
+  Trash2,
 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  ProductCustomizationPanel,
+  type ProductCustomizationFormState,
+} from "@/features/menu/product-customization-panel";
+import type { MenuProductData } from "@/features/menu/menu-customization-types";
+import { formatCurrency } from "@/lib/utils";
 
 interface Category {
   id: string;
@@ -24,23 +38,22 @@ interface Category {
   _count: { products: number };
 }
 
-interface Product {
-  id: string;
-  name: string;
-  description: string | null;
-  price: number;
-  isActive: boolean;
-  isHighlight: boolean;
-  isInternalOnly: boolean;
-  categoryId: string;
-  category: { id: string; name: string };
-}
+type Product = MenuProductData;
 
 interface Props {
   restaurantId: string;
 }
 
-// ─── Category Modal ─────────────────────────────────────────────────────────
+function getInitialCustomization(initial?: Product): ProductCustomizationFormState {
+  return {
+    allowCustomization: initial?.allowCustomization ?? false,
+    allowSplit: initial?.allowSplit ?? false,
+    maxSplits: initial?.maxSplits ?? 2,
+    splitPriceRule: initial?.splitPriceRule ?? "HIGHEST",
+    modifierGroups: initial?.modifierGroups ?? [],
+    splitFlavors: initial?.splitFlavors ?? [],
+  };
+}
 
 function CategoryModal({
   restaurantId,
@@ -51,7 +64,7 @@ function CategoryModal({
   initial?: Category;
   onClose: () => void;
 }) {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [name, setName] = useState(initial?.name ?? "");
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +84,7 @@ function CategoryModal({
           body: JSON.stringify({ name }),
         });
       }
-      await qc.invalidateQueries({ queryKey: ["categories", restaurantId] });
+      await queryClient.invalidateQueries({ queryKey: ["categories", restaurantId] });
       onClose();
     } finally {
       setLoading(false);
@@ -79,16 +92,20 @@ function CategoryModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4"
+      role="dialog"
+      aria-modal="true"
+    >
       <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
-        <h2 className="text-lg font-bold text-neutral-900 mb-4">
+        <h2 className="mb-4 text-lg font-bold text-neutral-900">
           {initial ? "Editar categoria" : "Nova categoria"}
         </h2>
         <Input
           label="Nome"
           id="cat-name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(event) => setName(event.target.value)}
           autoFocus
         />
         <div className="mt-4 flex gap-3">
@@ -104,34 +121,38 @@ function CategoryModal({
   );
 }
 
-// ─── Product Modal ───────────────────────────────────────────────────────────
-
 function ProductModal({
   restaurantId,
   categories,
+  products,
   initial,
   defaultCategoryId,
   onClose,
 }: {
   restaurantId: string;
   categories: Category[];
+  products: Product[];
   initial?: Product;
   defaultCategoryId?: string;
   onClose: () => void;
 }) {
-  const qc = useQueryClient();
+  const queryClient = useQueryClient();
   const [form, setForm] = useState({
     name: initial?.name ?? "",
     description: initial?.description ?? "",
-    price: initial ? String(initial.price / 100) : "",
+    price: initial ? String(initial.price) : "",
     categoryId: initial?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "",
-    isHighlight: initial?.isHighlight ?? false,
+    isFeatured: initial?.isFeatured ?? false,
     isInternalOnly: initial?.isInternalOnly ?? false,
   });
+  const [customization, setCustomization] = useState<ProductCustomizationFormState>(
+    getInitialCustomization(initial)
+  );
   const [loading, setLoading] = useState(false);
+  const splitPricingActive = customization.allowSplit;
 
-  function update(k: keyof typeof form, v: string | boolean) {
-    setForm((p) => ({ ...p, [k]: v }));
+  function updateField(key: keyof typeof form, value: string | boolean) {
+    setForm((current) => ({ ...current, [key]: value }));
   }
 
   async function handleSave() {
@@ -139,22 +160,24 @@ function ProductModal({
     try {
       const payload = {
         ...form,
-        price: Math.round(parseFloat(form.price) * 100),
+        price: splitPricingActive ? 0 : Number(form.price || 0),
+        ...customization,
       };
-      if (initial) {
-        await fetch(`/api/restaurants/${restaurantId}/products/${initial.id}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      } else {
-        await fetch(`/api/restaurants/${restaurantId}/products`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-      await qc.invalidateQueries({ queryKey: ["products", restaurantId] });
+
+      const endpoint = initial
+        ? `/api/restaurants/${restaurantId}/products/${initial.id}`
+        : `/api/restaurants/${restaurantId}/products`;
+
+      await fetch(endpoint, {
+        method: initial ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["products", restaurantId] }),
+        queryClient.invalidateQueries({ queryKey: ["public-menu", restaurantId] }),
+      ]);
       onClose();
     } finally {
       setLoading(false);
@@ -162,62 +185,116 @@ function ProductModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50" role="dialog" aria-modal="true">
-      <div className="w-full max-w-lg rounded-t-2xl sm:rounded-2xl bg-white p-6 shadow-xl max-h-[90vh] overflow-y-auto">
-        <h2 className="text-lg font-bold text-neutral-900 mb-4">
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 sm:items-center"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="max-h-[92vh] w-full max-w-4xl overflow-y-auto rounded-t-2xl bg-white p-6 shadow-xl sm:rounded-2xl">
+        <h2 className="mb-4 text-lg font-bold text-neutral-900">
           {initial ? "Editar produto" : "Novo produto"}
         </h2>
-        <div className="space-y-3">
-          <Input label="Nome" id="prod-name" value={form.name} onChange={(e) => update("name", e.target.value)} autoFocus required />
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input
+              label="Nome"
+              id="prod-name"
+              value={form.name}
+              onChange={(event) => updateField("name", event.target.value)}
+              autoFocus
+              required
+            />
+            <div className="space-y-1.5">
+              <Input
+                label="Preço base (R$)"
+                id="prod-price"
+                type="number"
+                step="0.01"
+                min="0"
+                value={splitPricingActive ? "0" : form.price}
+                onChange={(event) => updateField("price", event.target.value)}
+                required={!splitPricingActive}
+                disabled={splitPricingActive}
+              />
+              <p className="text-xs text-neutral-500">
+                {splitPricingActive
+                  ? "Produtos com divisão usam somente a regra de sabores. O preço fixo fica desativado e é salvo como R$ 0,00."
+                  : "Usado para produtos sem divisão em sabores."}
+              </p>
+            </div>
+          </div>
+
           <div>
-            <label htmlFor="prod-description" className="block text-sm font-medium text-neutral-700 mb-1">Descrição</label>
+            <label
+              htmlFor="prod-description"
+              className="mb-1 block text-sm font-medium text-neutral-700"
+            >
+              Descrição
+            </label>
             <textarea
               id="prod-description"
               rows={2}
               value={form.description}
-              onChange={(e) => update("description", e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 resize-none"
+              onChange={(event) => updateField("description", event.target.value)}
+              className="focus:ring-primary-400 w-full resize-none rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
               placeholder="Opcional"
             />
           </div>
-          <Input label="Preço (R$)" id="prod-price" type="number" step="0.01" min="0" value={form.price} onChange={(e) => update("price", e.target.value)} required />
-          <div>
-            <label htmlFor="prod-category" className="block text-sm font-medium text-neutral-700 mb-1">Categoria</label>
-            <select
-              id="prod-category"
-              value={form.categoryId}
-              onChange={(e) => update("categoryId", e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
-            >
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex gap-4">
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-              <input
-                type="checkbox"
-                checked={form.isHighlight}
-                onChange={(e) => update("isHighlight", e.target.checked)}
-                className="h-4 w-4 rounded border-neutral-300"
-              />
-              Destaque
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-1 text-sm text-neutral-700">
+              <span className="block text-sm font-medium">Categoria</span>
+              <select
+                value={form.categoryId}
+                onChange={(event) => updateField("categoryId", event.target.value)}
+                className="focus:ring-primary-400 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              >
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
             </label>
-            <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
-              <input
-                type="checkbox"
-                checked={form.isInternalOnly}
-                onChange={(e) => update("isInternalOnly", e.target.checked)}
-                className="h-4 w-4 rounded border-neutral-300"
-              />
-              Apenas interno
-            </label>
+            <div className="flex flex-wrap items-center gap-4 rounded-2xl border border-neutral-200 px-4 py-3">
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={form.isFeatured}
+                  onChange={(event) => updateField("isFeatured", event.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                Destaque
+              </label>
+              <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
+                <input
+                  type="checkbox"
+                  checked={form.isInternalOnly}
+                  onChange={(event) => updateField("isInternalOnly", event.target.checked)}
+                  className="h-4 w-4 rounded border-neutral-300"
+                />
+                Apenas interno
+              </label>
+            </div>
           </div>
+
+          <ProductCustomizationPanel
+            form={customization}
+            products={products}
+            currentProductId={initial?.id}
+            onChange={setCustomization}
+          />
         </div>
-        <div className="mt-5 flex gap-3">
-          <Button variant="outline" className="flex-1" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-1" onClick={handleSave} loading={loading} disabled={!form.name.trim() || !form.price}>
+        <div className="mt-6 flex gap-3">
+          <Button variant="outline" className="flex-1" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            className="flex-1"
+            onClick={handleSave}
+            loading={loading}
+            disabled={!form.name.trim() || (!splitPricingActive && !form.price)}
+          >
             Salvar
           </Button>
         </div>
@@ -226,13 +303,17 @@ function ProductModal({
   );
 }
 
-// ─── Main Component ──────────────────────────────────────────────────────────
-
 export function MenuManagement({ restaurantId }: Props) {
-  const qc = useQueryClient();
-  const [expandedCat, setExpandedCat] = useState<string | null>(null);
-  const [catModal, setCatModal] = useState<{ open: boolean; editing?: Category }>({ open: false });
-  const [prodModal, setProdModal] = useState<{ open: boolean; editing?: Product; catId?: string }>({ open: false });
+  const queryClient = useQueryClient();
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [categoryModal, setCategoryModal] = useState<{ open: boolean; editing?: Category }>({
+    open: false,
+  });
+  const [productModal, setProductModal] = useState<{
+    open: boolean;
+    editing?: Product;
+    categoryId?: string;
+  }>({ open: false });
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ["categories", restaurantId],
@@ -251,25 +332,56 @@ export function MenuManagement({ restaurantId }: Props) {
   });
 
   const deleteCategory = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/restaurants/${restaurantId}/categories/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["categories", restaurantId] }),
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/restaurants/${restaurantId}/categories/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Erro ao excluir categoria");
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["categories", restaurantId] });
+      toast.success("Categoria excluída com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir categoria.");
+    },
   });
 
   const deleteProduct = useMutation({
-    mutationFn: (id: string) =>
-      fetch(`/api/restaurants/${restaurantId}/products/${id}`, { method: "DELETE" }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["products", restaurantId] }),
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/restaurants/${restaurantId}/products/${id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Erro ao excluir produto");
+      return res;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      toast.success("Produto excluído com sucesso!");
+    },
+    onError: () => {
+      toast.error("Erro ao excluir produto.");
+    },
   });
 
   const toggleProduct = useMutation({
-    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
-      fetch(`/api/restaurants/${restaurantId}/products/${id}`, {
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const res = await fetch(`/api/restaurants/${restaurantId}/products/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isActive }),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["products", restaurantId] }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar produto");
+      return res;
+    },
+    onSuccess: (_, { isActive }) => {
+      queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      toast.success(isActive ? "Produto ativado!" : "Produto desativado!");
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar produto.");
+    },
   });
 
   return (
@@ -277,9 +389,11 @@ export function MenuManagement({ restaurantId }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Cardápio</h1>
-          <p className="text-sm text-neutral-500">{categories.length} categorias · {products.length} produtos</p>
+          <p className="text-sm text-neutral-500">
+            {categories.length} categorias · {products.length} produtos
+          </p>
         </div>
-        <Button onClick={() => setCatModal({ open: true })}>
+        <Button onClick={() => setCategoryModal({ open: true })}>
           <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
           Nova categoria
         </Button>
@@ -289,116 +403,163 @@ export function MenuManagement({ restaurantId }: Props) {
         <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">
           <PackageX className="h-12 w-12 text-neutral-300" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-semibold text-neutral-700">Nenhuma categoria ainda</h2>
-          <p className="mt-1 text-sm text-neutral-400">Crie uma categoria para começar a adicionar produtos</p>
-          <Button className="mt-6" onClick={() => setCatModal({ open: true })}>
+          <p className="mt-1 text-sm text-neutral-400">
+            Crie uma categoria para começar a adicionar produtos
+          </p>
+          <Button className="mt-6" onClick={() => setCategoryModal({ open: true })}>
             <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
             Criar primeira categoria
           </Button>
         </div>
       ) : (
         <div className="space-y-3">
-          {categories.map((cat) => {
-            const catProducts = products.filter((p) => p.categoryId === cat.id);
-            const isExpanded = expandedCat === cat.id;
+          {categories.map((category) => {
+            const categoryProducts = products.filter(
+              (product) => product.categoryId === category.id
+            );
+            const isExpanded = expandedCategory === category.id;
 
             return (
-              <div key={cat.id} className="rounded-2xl bg-white shadow-sm overflow-hidden">
-                {/* Category header */}
-                <div className="flex items-center gap-3 px-4 py-3 cursor-pointer hover:bg-neutral-50 transition-colors"
-                  onClick={() => setExpandedCat(isExpanded ? null : cat.id)}
+              <div key={category.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
+                <div
+                  className="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50"
+                  onClick={() => setExpandedCategory(isExpanded ? null : category.id)}
                 >
-                  {isExpanded
-                    ? <ChevronDown className="h-4 w-4 text-neutral-400 shrink-0" aria-hidden="true" />
-                    : <ChevronRight className="h-4 w-4 text-neutral-400 shrink-0" aria-hidden="true" />
-                  }
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
+                  ) : (
+                    <ChevronRight
+                      className="h-4 w-4 shrink-0 text-neutral-400"
+                      aria-hidden="true"
+                    />
+                  )}
                   <div className="flex-1">
-                    <span className="font-semibold text-neutral-900">{cat.name}</span>
-                    <span className="ml-2 text-xs text-neutral-400">{catProducts.length} produto{catProducts.length !== 1 ? "s" : ""}</span>
+                    <span className="font-semibold text-neutral-900">{category.name}</span>
+                    <span className="ml-2 text-xs text-neutral-400">
+                      {categoryProducts.length} produto{categoryProducts.length !== 1 ? "s" : ""}
+                    </span>
                   </div>
-                  <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="flex items-center gap-1"
+                    onClick={(event) => event.stopPropagation()}
+                  >
                     <button
-                      onClick={() => setProdModal({ open: true, catId: cat.id })}
-                      className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-primary-500"
-                      aria-label={`Adicionar produto em ${cat.name}`}
+                      onClick={() => setProductModal({ open: true, categoryId: category.id })}
+                      className="hover:text-primary-500 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
+                      aria-label={`Adicionar produto em ${category.name}`}
                     >
                       <Plus className="h-4 w-4" aria-hidden="true" />
                     </button>
                     <button
-                      onClick={() => setCatModal({ open: true, editing: cat })}
+                      onClick={() => setCategoryModal({ open: true, editing: category })}
                       className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-                      aria-label={`Editar ${cat.name}`}
+                      aria-label={`Editar ${category.name}`}
                     >
                       <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                     <button
                       onClick={() => {
-                        if (catProducts.length > 0) return alert("Remova os produtos antes de excluir a categoria.");
-                        if (confirm(`Excluir "${cat.name}"?`)) deleteCategory.mutate(cat.id);
+                        if (categoryProducts.length > 0) {
+                          toast.warning("Remova os produtos antes de excluir a categoria.");
+                          return;
+                        }
+                        if (confirm(`Excluir \"${category.name}\"?`))
+                          deleteCategory.mutate(category.id);
                       }}
                       className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500"
-                      aria-label={`Excluir ${cat.name}`}
+                      aria-label={`Excluir ${category.name}`}
                     >
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
 
-                {/* Products list */}
                 {isExpanded && (
                   <div className="border-t border-neutral-100">
-                    {catProducts.length === 0 ? (
+                    {categoryProducts.length === 0 ? (
                       <div className="py-6 text-center text-sm text-neutral-400">
                         Nenhum produto nesta categoria.{" "}
                         <button
-                          onClick={() => setProdModal({ open: true, catId: cat.id })}
+                          onClick={() => setProductModal({ open: true, categoryId: category.id })}
                           className="text-primary-500 hover:underline"
                         >
                           Adicionar
                         </button>
                       </div>
                     ) : (
-                      catProducts.map((product, idx) => (
+                      categoryProducts.map((product, index) => (
                         <div
                           key={product.id}
-                          className={`flex items-center gap-3 px-4 py-3 ${idx < catProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : ""}`}
+                          className={`flex items-center gap-3 px-4 py-3 ${index < categoryProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : ""}`}
                         >
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-neutral-900 truncate">{product.name}</p>
-                              {product.isHighlight && (
-                                <Star className="h-3.5 w-3.5 text-accent-500 shrink-0" aria-label="Destaque" />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-semibold text-neutral-900">
+                                {product.name}
+                              </p>
+                              {product.isFeatured && (
+                                <Star
+                                  className="text-accent-500 h-3.5 w-3.5 shrink-0"
+                                  aria-label="Destaque"
+                                />
+                              )}
+                              {product.allowSplit && (
+                                <Split
+                                  className="h-3.5 w-3.5 shrink-0 text-sky-500"
+                                  aria-label="Divisível"
+                                />
                               )}
                               {product.isInternalOnly && (
-                                <EyeOff className="h-3.5 w-3.5 text-neutral-400 shrink-0" aria-label="Apenas interno" />
+                                <EyeOff
+                                  className="h-3.5 w-3.5 shrink-0 text-neutral-400"
+                                  aria-label="Apenas interno"
+                                />
+                              )}
+                              {product.allowCustomization && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Modificadores
+                                </Badge>
                               )}
                               {!product.isActive && (
-                                <Badge variant="secondary" className="text-xs">Inativo</Badge>
+                                <Badge variant="secondary" className="text-xs">
+                                  Inativo
+                                </Badge>
                               )}
                             </div>
                             {product.description && (
-                              <p className="text-xs text-neutral-400 truncate">{product.description}</p>
+                              <p className="truncate text-xs text-neutral-400">
+                                {product.description}
+                              </p>
                             )}
                           </div>
-                          <span className="text-sm font-bold text-neutral-900 shrink-0">
+                          <span className="shrink-0 text-sm font-bold text-neutral-900">
                             {formatCurrency(product.price)}
                           </span>
-                          <div className="flex items-center gap-1 shrink-0">
+                          <div className="flex shrink-0 items-center gap-1">
                             <button
-                              onClick={() => toggleProduct.mutate({ id: product.id, isActive: !product.isActive })}
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${product.isActive ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}
-                              aria-label={product.isActive ? "Desativar" : "Ativar"}
+                              onClick={() =>
+                                toggleProduct.mutate({
+                                  id: product.id,
+                                  isActive: !(product.isActive ?? true),
+                                })
+                              }
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${(product.isActive ?? true) ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}
+                              aria-label={(product.isActive ?? true) ? "Desativar" : "Ativar"}
                             >
-                              {product.isActive ? "Ativo" : "Inativo"}
+                              {(product.isActive ?? true) ? "Ativo" : "Inativo"}
                             </button>
                             <button
-                              onClick={() => setProdModal({ open: true, editing: product })}
+                              onClick={() => setProductModal({ open: true, editing: product })}
                               className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
                               aria-label={`Editar ${product.name}`}
                             >
                               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                             <button
-                              onClick={() => { if (confirm(`Excluir "${product.name}"?`)) deleteProduct.mutate(product.id); }}
+                              onClick={() => {
+                                if (confirm(`Excluir \"${product.name}\"?`))
+                                  deleteProduct.mutate(product.id);
+                              }}
                               className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500"
                               aria-label={`Excluir ${product.name}`}
                             >
@@ -416,20 +577,22 @@ export function MenuManagement({ restaurantId }: Props) {
         </div>
       )}
 
-      {catModal.open && (
+      {categoryModal.open && (
         <CategoryModal
           restaurantId={restaurantId}
-          initial={catModal.editing}
-          onClose={() => setCatModal({ open: false })}
+          initial={categoryModal.editing}
+          onClose={() => setCategoryModal({ open: false })}
         />
       )}
-      {prodModal.open && (
+
+      {productModal.open && (
         <ProductModal
           restaurantId={restaurantId}
           categories={categories}
-          initial={prodModal.editing}
-          defaultCategoryId={prodModal.catId}
-          onClose={() => setProdModal({ open: false })}
+          products={products}
+          initial={productModal.editing}
+          defaultCategoryId={productModal.categoryId}
+          onClose={() => setProductModal({ open: false })}
         />
       )}
     </div>

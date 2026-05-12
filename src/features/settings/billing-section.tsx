@@ -1,6 +1,7 @@
 "use client";
 
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { CreditCard, Zap, Building2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -61,7 +62,11 @@ export function BillingSection({ restaurantId }: Props) {
       return json as { url: string };
     },
     onSuccess: ({ url }) => {
+      toast.info("Redirecionando para o checkout...");
       window.location.href = url;
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Erro ao iniciar checkout");
     },
   });
 
@@ -75,7 +80,11 @@ export function BillingSection({ restaurantId }: Props) {
       return json as { url: string };
     },
     onSuccess: ({ url }) => {
+      toast.info("Abrindo portal de cobrança...");
       window.location.href = url;
+    },
+    onError: (error) => {
+      toast.error(error instanceof Error ? error.message : "Erro ao abrir portal");
     },
   });
 

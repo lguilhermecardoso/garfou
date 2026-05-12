@@ -116,7 +116,7 @@ describe("orderService", () => {
 
       await expect(
         orderService.updateStatus("rest-1", "order-1", {
-          status: "NOVO_PEDIDO",
+          status: "NOVO_PEDIDO" as unknown as "CONFIRMADO",
         })
       ).rejects.toThrow("Transição inválida");
     });
@@ -151,7 +151,16 @@ describe("orderService", () => {
     it("throws error when product not found", async () => {
       const input = {
         type: "DINE_IN" as const,
-        items: [{ productId: "prod-1", quantity: 1, notes: "", addons: [] }],
+        items: [
+          {
+            productId: "prod-1",
+            quantity: 1,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [],
+          },
+        ],
       };
 
       vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([]);
@@ -165,14 +174,38 @@ describe("orderService", () => {
       const input = {
         type: "DINE_IN" as const,
         items: [
-          { productId: "prod-1", quantity: 1, notes: "", addons: [] },
-          { productId: "prod-2", quantity: 1, notes: "", addons: [] },
+          {
+            productId: "prod-1",
+            quantity: 1,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [],
+          },
+          {
+            productId: "prod-2",
+            quantity: 1,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [],
+          },
         ],
       };
 
       // Only return one product when two were requested
       vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([
-        { id: "prod-1", price: 1000, addons: [] } as any,
+        {
+          id: "prod-1",
+          price: 1000,
+          addons: [],
+          modifierGroups: [],
+          splitSources: [],
+          allowCustomization: false,
+          allowSplit: false,
+          maxSplits: 2,
+          splitPriceRule: "HIGHEST",
+        } as any,
       ]);
 
       await expect(orderService.createOrder("rest-1", input as any)).rejects.toThrow(
@@ -183,11 +216,30 @@ describe("orderService", () => {
     it("creates order with valid products", async () => {
       const input = {
         type: "DINE_IN" as const,
-        items: [{ productId: "prod-1", quantity: 2, notes: "", addons: [] }],
+        items: [
+          {
+            productId: "prod-1",
+            quantity: 2,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [],
+          },
+        ],
       };
 
       vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([
-        { id: "prod-1", price: 1000, addons: [] } as any,
+        {
+          id: "prod-1",
+          price: 1000,
+          addons: [],
+          modifierGroups: [],
+          splitSources: [],
+          allowCustomization: false,
+          allowSplit: false,
+          maxSplits: 2,
+          splitPriceRule: "HIGHEST",
+        } as any,
       ]);
 
       vi.mocked(prisma.restaurant.findUnique).mockResolvedValue({
@@ -205,6 +257,105 @@ describe("orderService", () => {
 
       expect(orderRepository.create).toHaveBeenCalled();
       expect(result.orderNumber).toBe(1);
+    });
+
+    it("requires split selection for split products and uses highest flavor price", async () => {
+      const input = {
+        type: "DINE_IN" as const,
+        items: [
+          {
+            productId: "prod-split",
+            quantity: 1,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [
+              { splitIndex: 0, flavorProductId: "flavor-1" },
+              { splitIndex: 1, flavorProductId: "flavor-2" },
+            ],
+          },
+        ],
+      };
+
+      vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([
+        {
+          id: "prod-split",
+          name: "Pizza Grande 2 Sabores",
+          price: 0,
+          addons: [],
+          modifierGroups: [],
+          splitSources: [
+            {
+              flavorProductId: "flavor-1",
+              isAvailable: true,
+              flavorProduct: { id: "flavor-1", name: "Calabresa", price: 50, deletedAt: null },
+            },
+            {
+              flavorProductId: "flavor-2",
+              isAvailable: true,
+              flavorProduct: { id: "flavor-2", name: "Frango", price: 60, deletedAt: null },
+            },
+          ],
+          allowCustomization: false,
+          allowSplit: true,
+          maxSplits: 2,
+          splitPriceRule: "HIGHEST",
+        } as any,
+      ]);
+
+      vi.mocked(prisma.restaurant.findUnique).mockResolvedValue({
+        settings: { autoApproveOrders: false },
+      } as any);
+      vi.mocked(orderRepository.getNextOrderNumber).mockResolvedValue(10);
+      vi.mocked(orderRepository.create).mockResolvedValue({
+        id: "order-10",
+        orderNumber: 10,
+      } as any);
+
+      await orderService.createOrder("rest-1", input as any);
+
+      expect(orderRepository.create).toHaveBeenCalledWith(
+        "rest-1",
+        expect.objectContaining({
+          subtotal: 60,
+          total: 60,
+        })
+      );
+    });
+
+    it("rejects split product without all required flavors", async () => {
+      const input = {
+        type: "DINE_IN" as const,
+        items: [
+          {
+            productId: "prod-split",
+            quantity: 1,
+            notes: "",
+            addons: [],
+            selectedOptions: [],
+            splits: [],
+          },
+        ],
+      };
+
+      vi.mocked(menuRepository.findProductsByIds).mockResolvedValue([
+        {
+          id: "prod-split",
+          name: "Pizza Grande 2 Sabores",
+          price: 0,
+          addons: [],
+          modifierGroups: [],
+          splitSources: [],
+          allowCustomization: false,
+          allowSplit: true,
+          maxSplits: 2,
+          splitPriceRule: "HIGHEST",
+        } as any,
+      ]);
+
+      await expect(orderService.createOrder("rest-1", input as any)).rejects.toThrow(
+        "O produto Pizza Grande 2 Sabores exige a selecao de 2 sabores"
+      );
     });
   });
 });

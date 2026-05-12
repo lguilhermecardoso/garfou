@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   signUpSchema,
+  createProductSchema,
   createOrderSchema,
   createCouponSchema,
   updateOrderStatusSchema,
@@ -55,6 +56,38 @@ describe("Validation Schemas", () => {
         password: "SecurePass123",
       };
       const result = signUpSchema.safeParse(invalid);
+      expect(result.success).toBe(false);
+    });
+  });
+
+  describe("createProductSchema", () => {
+    it("accepts split product without fixed price", () => {
+      const valid = {
+        categoryId: "c6s9m1p0z0000000000000000",
+        name: "Pizza Grande 2 Sabores",
+        description: "",
+        price: 0,
+        allowSplit: true,
+        maxSplits: 2,
+        splitPriceRule: "HIGHEST" as const,
+        splitFlavors: [
+          { flavorProductId: "c6s9m1p0z0000000000000001", sortOrder: 0, isAvailable: true },
+        ],
+      };
+      const result = createProductSchema.safeParse(valid);
+      expect(result.success).toBe(true);
+    });
+
+    it("rejects zero fixed price for non-split product", () => {
+      const invalid = {
+        categoryId: "c6s9m1p0z0000000000000000",
+        name: "Pizza tradicional",
+        description: "",
+        price: 0,
+        allowSplit: false,
+        splitFlavors: [],
+      };
+      const result = createProductSchema.safeParse(invalid);
       expect(result.success).toBe(false);
     });
   });

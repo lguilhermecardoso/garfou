@@ -4,11 +4,17 @@
  * Live widget for the dashboard that shows up to 5 orders with status
  * NOVO_PEDIDO or AGUARDANDO_CONFIRMACAO. Auto-refreshes every 8 seconds.
  *
- * Each row offers:
+ * Features:
  *  - Eye button  → opens OrderDetailModal (full receipt + approve/cancel)
  *  - Confirm button → PATCH status to CONFIRMADO inline (with auto-print)
+ *  - Notification sound loop — toca continuamente até ser marcado como lido
+ *  - Read/unread state — persiste no localStorage para cada pedido
+ *  - Visual indicator — sino pulsando quando há pedidos não lidos
  *
- * When there are no pending orders, renders a quiet empty state.
+ * Behavior:
+ *  - Som toca em loop (a cada 2s) quando há pedidos não lidos
+ *  - Som para quando: usuário clica no sino, visualiza pedido, ou confirma pedido
+ *  - Estado de leitura persiste entre recarregamentos da página
  *
  * Props:
  *  @param restaurantId   — Restaurant UUID used in API calls
@@ -25,6 +31,9 @@ import { printOrder } from "./order-print-receipt";
 import type { PrintOrder } from "./order-print-receipt";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { CheckCircle, Eye, RefreshCw, BellRing } from "lucide-react";
+import { PrintConfirmationModal } from "@/components/shared/print-confirmation-modal";
+import { usePrintConfirmation } from "@/hooks/use-print-confirmation";
+import { useNotificationSound } from "@/hooks/use-notification-sound";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +55,41 @@ interface Props {
 }
 
 const POLL_MS = 8_000;
+const READ_ORDERS_KEY = "garfou:read-orders";
+
+// ─── Helper: localStorage for read state ─────────────────────────────────────
+
+function getReadOrders(): Set<string> {
+  if (typeof window === "undefined") return new Set();
+  try {
+    const stored = localStorage.getItem(READ_ORDERS_KEY);
+    return stored ? new Set(JSON.parse(stored)) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
+function markOrderAsRead(orderId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const readOrders = getReadOrders();
+    readOrders.add(orderId);
+    localStorage.setItem(READ_ORDERS_KEY, JSON.stringify([...readOrders]));
+  } catch {
+    // localStorage não disponível - ignora
+  }
+}
+
+function markAllOrdersAsRead(orderIds: string[]) {
+  if (typeof window === "undefined") return;
+  try {
+    const readOrders = getReadOrders();
+    orderIds.forEach((id) => readOrders.add(id));
+    localStorage.setItem(READ_ORDERS_KEY, JSON.stringify([...readOrders]));
+  } catch {
+    // localStorage não disponível - ignora
+  }
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -58,7 +102,10 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
   const [now, setNow] = useState(() => Date.now());
   const [actioning, setActioning] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [readOrders, setReadOrders] = useState<Set<string>>(() => getReadOrders());
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const printConfirmation = usePrintConfirmation();
+  const notificationSound = useNotificationSound();
 
   // ─── Fetch ──────────────────────────────────────────────────────────────
 
@@ -87,9 +134,46 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
     };
   }, [fetchPending]);
 
+  // ─── Notification Sound Control ─────────────────────────────────────────
+
+  // Calcula quantos pedidos não lidos existem
+  const unreadCount = orders.filter((o) => !readOrders.has(o.id)).length;
+
+  // Toca som em loop se há pedidos não lidos, para quando todos foram lidos
+  useEffect(() => {
+    if (unreadCount > 0) {
+      notificationSound.play();
+    } else {
+      notificationSound.stop();
+    }
+    // Cleanup: para o som quando componente desmonta
+    return () => {
+      notificationSound.stop();
+    };
+  }, [unreadCount, notificationSound]);
+
+  // ─── Mark as Read ────────────────────────────────────────────────────────
+
+  const handleMarkAllAsRead = useCallback(() => {
+    const orderIds = orders.map((o) => o.id);
+    markAllOrdersAsRead(orderIds);
+    setReadOrders(getReadOrders());
+    notificationSound.stop();
+  }, [orders, notificationSound]);
+
+  const handleViewOrder = useCallback((orderId: string) => {
+    markOrderAsRead(orderId);
+    setReadOrders(getReadOrders());
+    setSelectedOrderId(orderId);
+  }, []);
+
   // ─── Inline confirm action ───────────────────────────────────────────────
 
   async function confirmOrder(order: PendingOrder) {
+    // Marca como lido e para o som ao confirmar
+    markOrderAsRead(order.id);
+    setReadOrders(getReadOrders());
+
     setActioning(order.id);
     try {
       const res = await fetch(`/api/restaurants/${restaurantId}/orders/${order.id}`, {
@@ -101,9 +185,9 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
       const json = await res.json();
       const updated = json.data ?? json;
 
-      // Auto-print after confirm
+      // Auto-print after confirm with confirmation modal
       if (updated) {
-        printOrder(updated as unknown as PrintOrder);
+        printConfirmation.startPrint(() => printOrder(updated as unknown as PrintOrder));
       }
 
       // Remove from list (no longer pending)
@@ -127,6 +211,9 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
         restaurantId={restaurantId}
         onClose={() => setSelectedOrderId(null)}
         onStatusChange={(id) => {
+          // Marca como lido ao confirmar/recusar do modal
+          markOrderAsRead(id);
+          setReadOrders(getReadOrders());
           setOrders((prev) => prev.filter((o) => o.id !== id));
           setSelectedOrderId(null);
         }}
@@ -136,7 +223,9 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
         {/* Header */}
         <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100">
+            <div
+              className={`flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 ${unreadCount > 0 ? "animate-pulse" : ""}`}
+            >
               <BellRing className="h-4 w-4 text-amber-600" aria-hidden="true" />
             </div>
             <div>
@@ -144,11 +233,24 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
               <p className="text-xs text-neutral-400">Atualiza a cada 8s</p>
             </div>
           </div>
-          {orders.length > 0 && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-xs font-bold text-white">
-              {orders.length}
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                onClick={handleMarkAllAsRead}
+                className="text-xs text-amber-600 hover:text-amber-700 hover:underline"
+                title="Marcar todos como lidos"
+              >
+                Marcar como lido
+              </button>
+            )}
+            {orders.length > 0 && (
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold text-white ${unreadCount > 0 ? "animate-pulse bg-red-500" : "bg-amber-500"}`}
+              >
+                {unreadCount > 0 ? unreadCount : orders.length}
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Body */}
@@ -165,11 +267,20 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
           >
             {orders.map((order) => {
               const elapsed = Math.round((now - new Date(order.createdAt).getTime()) / 60_000);
+              const isUnread = !readOrders.has(order.id);
               return (
                 <li
                   key={order.id}
-                  className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-neutral-50"
+                  className={`flex items-center gap-3 px-5 py-3 transition-colors hover:bg-neutral-50 ${isUnread ? "bg-amber-50/50" : ""}`}
                 >
+                  {/* Unread indicator */}
+                  {isUnread && (
+                    <div
+                      className="h-2 w-2 animate-pulse rounded-full bg-red-500"
+                      aria-hidden="true"
+                    />
+                  )}
+
                   {/* Order info */}
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
@@ -200,7 +311,7 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
                   {/* Actions */}
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setSelectedOrderId(order.id)}
+                      onClick={() => handleViewOrder(order.id)}
                       title="Ver detalhes"
                       aria-label={`Ver detalhes do pedido #${order.orderNumber}`}
                       className="rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200"
@@ -239,6 +350,14 @@ export function DashboardPendingOrders({ restaurantId }: Props) {
           </div>
         )}
       </div>
+
+      {/* Print Confirmation Modal */}
+      <PrintConfirmationModal
+        open={printConfirmation.isOpen}
+        onOpenChange={printConfirmation.handleCancel}
+        onConfirm={printConfirmation.handleConfirm}
+        onRetry={printConfirmation.handleRetry}
+      />
     </>
   );
 }

@@ -21,10 +21,15 @@ model User {
   image         String?
   passwordHash  String?
 
-  accounts      Account[]
-  sessions      Session[]
-  restaurants   UserRestaurant[]
-  orders        Order[]          @relation("WaiterOrders")
+  accounts             Account[]
+  sessions             Session[]
+  restaurants          UserRestaurant[]
+  orders               Order[]             @relation("WaiterOrders")
+  tabsOpened           Tab[]               @relation("TabsOpened")
+  tabsClosed           Tab[]               @relation("TabsClosed")
+  cashRegistersOpened  CashRegister[]      @relation("CashRegisterOpenedBy")
+  cashRegistersClosed  CashRegister[]      @relation("CashRegisterClosedBy")
+  cashTransactions     CashTransaction[]   @relation("CashTransactionUser")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -117,6 +122,11 @@ model Restaurant {
   categories      Category[]
   products        Product[]
   productAddons   ProductAddon[]
+  modifierGroups  ModifierGroup[]
+  modifierOptions ModifierOption[]
+  splitFlavors    ProductSplitFlavor[]
+  tables          Table[]
+  tabs            Tab[]
   orders          Order[]
   customers       Customer[]
   inventoryItems  InventoryItem[]
@@ -126,6 +136,7 @@ model Restaurant {
   deliveryZones   DeliveryZone[]
   coupons         Coupon[]
   npsResponses    NpsResponse[]
+  cashRegisters   CashRegister[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -185,13 +196,21 @@ model Product {
   isActive        Boolean  @default(true)
   isInternalOnly  Boolean  @default(false)
   isFeatured      Boolean  @default(false)
+  allowCustomization Boolean @default(false)
+  allowSplit      Boolean  @default(false)
+  maxSplits       Int      @default(2)
+  splitPriceRule  SplitPriceRule @default(HIGHEST)
   preparationTime Int?     // minutes
   costPrice       Decimal? @db.Decimal(10, 2)
 
-  restaurant  Restaurant     @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
-  category    Category       @relation(fields: [categoryId], references: [id])
-  addons      ProductAddon[]
-  orderItems  OrderItem[]
+  restaurant      Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  category        Category            @relation(fields: [categoryId], references: [id])
+  addons          ProductAddon[]
+  modifierGroups  ModifierGroup[]
+  splitSources    ProductSplitFlavor[] @relation("SplitSource")
+  splitTargets    ProductSplitFlavor[] @relation("SplitTarget")
+  orderItems      OrderItem[]
+  orderItemSplits OrderItemSplit[]
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -221,6 +240,157 @@ model ProductAddon {
   @@map("product_addons")
 }
 
+enum ModifierGroupType {
+  INGREDIENT
+  ADDON
+  REQUIRED_CHOICE
+  REQUIRED_MULTI
+}
+
+enum SplitPriceRule {
+  HIGHEST
+  AVERAGE
+  SUM
+}
+
+model ModifierGroup {
+  id            String            @id @default(cuid())
+  restaurantId  String
+  productId      String
+  name          String
+  type          ModifierGroupType
+  minSelections Int               @default(0)
+  maxSelections Int               @default(1)
+  sortOrder     Int               @default(0)
+
+  restaurant Restaurant       @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  product    Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options    ModifierOption[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([restaurantId, productId, deletedAt])
+  @@map("modifier_groups")
+}
+
+model ModifierOption {
+  id           String   @id @default(cuid())
+  restaurantId String
+  groupId       String
+  name         String
+  price        Decimal  @db.Decimal(10, 2) @default(0)
+  isDefault    Boolean  @default(false)
+  isAvailable  Boolean  @default(true)
+  sortOrder    Int      @default(0)
+
+  restaurant      Restaurant                @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  group           ModifierGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  orderSelections OrderItemSelectedOption[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@index([restaurantId, groupId, deletedAt])
+  @@map("modifier_options")
+}
+
+model ProductSplitFlavor {
+  id              String  @id @default(cuid())
+  restaurantId    String
+  sourceProductId String
+  flavorProductId String
+  sortOrder       Int     @default(0)
+  isAvailable     Boolean @default(true)
+
+  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  sourceProduct Product    @relation("SplitSource", fields: [sourceProductId], references: [id], onDelete: Cascade)
+  flavorProduct Product    @relation("SplitTarget", fields: [flavorProductId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sourceProductId, flavorProductId])
+  @@index([restaurantId, sourceProductId])
+  @@map("product_split_flavors")
+}
+
+// ─────────────────────────────────────────────
+// TABLES & TABS (Comandas)
+// ─────────────────────────────────────────────
+
+enum TableStatus {
+  AVAILABLE
+  OCCUPIED
+  RESERVED
+}
+
+model Table {
+  id           String      @id @default(cuid())
+  restaurantId String
+  identifier   String
+  capacity     Int?
+  status       TableStatus @default(AVAILABLE)
+  isActive     Boolean     @default(true)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tabs       Tab[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  @@unique([restaurantId, identifier])
+  @@index([restaurantId, status, isActive])
+  @@map("tables")
+}
+
+enum TabStatus {
+  OPEN
+  CLOSED
+  PAID
+  CANCELLED
+}
+
+model Tab {
+  id           String    @id @default(cuid())
+  restaurantId String
+  tableId      String?
+  customerId   String?
+  guestCustomerName String? // Cliente avulso (não salvo em customers)
+  openedBy     String
+  closedBy     String?
+
+  status       TabStatus      @default(OPEN)
+  total        Decimal        @db.Decimal(10, 2) @default(0)
+  discount     Decimal        @db.Decimal(10, 2) @default(0)
+  serviceCharge Decimal       @db.Decimal(10, 2) @default(0)  // Taxa de serviço (10%)
+  coverCharge   Decimal       @db.Decimal(10, 2) @default(0)  // Couvert artístico
+  finalTotal   Decimal        @db.Decimal(10, 2) @default(0)
+
+  paymentMethod PaymentMethod?
+  paidAt        DateTime?
+  notes         String?
+
+  restaurant   Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  table        Table?      @relation(fields: [tableId], references: [id])
+  customer     Customer?   @relation(fields: [customerId], references: [id])
+  openedByUser User        @relation("TabsOpened", fields: [openedBy], references: [id])
+  closedByUser User?       @relation("TabsClosed", fields: [closedBy], references: [id])
+  orders       Order[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  @@index([restaurantId, status, createdAt(sort: Desc)])
+  @@index([restaurantId, tableId, status])
+  @@index([restaurantId, customerId, status])
+  @@map("tabs")
+}
+
 // ─────────────────────────────────────────────
 // ORDERS
 // ─────────────────────────────────────────────
@@ -247,6 +417,7 @@ enum PaymentMethod {
   PIX
   CREDIT_CARD
   DEBIT_CARD
+  VOUCHER
 }
 
 enum PaymentStatus {
@@ -259,6 +430,7 @@ model Order {
   id           String        @id @default(cuid())
   restaurantId String
   orderNumber  Int
+  tabId        String?
   customerId   String?
   waiterId     String?
   tableNumber  String?
@@ -282,12 +454,14 @@ model Order {
   printConfirmed Boolean   @default(false)
 
   restaurant Restaurant  @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  tab        Tab?        @relation(fields: [tabId], references: [id])
   customer   Customer?   @relation(fields: [customerId], references: [id])
   waiter     User?       @relation("WaiterOrders", fields: [waiterId], references: [id])
   coupon     Coupon?     @relation(fields: [couponId], references: [id])
   items      OrderItem[]
   nps        NpsResponse[]
-  financeEntries FinanceEntry[]
+  financeEntries  FinanceEntry[]
+  cashTransactions CashTransaction[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -309,6 +483,8 @@ model OrderItem {
   order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product        @relation(fields: [productId], references: [id])
   addons  OrderItemAddon[]
+  selectedOptions OrderItemSelectedOption[]
+  splits          OrderItemSplit[]
 
   createdAt DateTime @default(now())
 
@@ -328,6 +504,42 @@ model OrderItemAddon {
   @@map("order_item_addons")
 }
 
+model OrderItemSelectedOption {
+  id               String  @id @default(cuid())
+  orderItemId      String
+  optionId         String
+  quantity         Int     @default(1)
+  unitPrice        Decimal @db.Decimal(10, 2)
+  optionName       String
+  isRemoval        Boolean @default(false)
+
+  orderItem OrderItem       @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  option    ModifierOption  @relation(fields: [optionId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([orderItemId])
+  @@map("order_item_selected_options")
+}
+
+model OrderItemSplit {
+  id          String  @id @default(cuid())
+  orderItemId String
+  splitIndex  Int
+  productId    String
+  productName String
+  unitPrice   Decimal @db.Decimal(10, 2)
+
+  orderItem OrderItem @relation(fields: [orderItemId], references: [id], onDelete: Cascade)
+  product   Product   @relation(fields: [productId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@unique([orderItemId, splitIndex])
+  @@index([orderItemId])
+  @@map("order_item_splits")
+}
+
 // ─────────────────────────────────────────────
 // CUSTOMERS (CRM)
 // ─────────────────────────────────────────────
@@ -340,9 +552,11 @@ model Customer {
   email        String?
   address      Json?
   notes        String?
+  source       String? // Source of customer creation: DIGITAL_MENU, MANUAL, POS, etc.
   totalOrders  Int     @default(0)
   totalSpent   Decimal @db.Decimal(10, 2) @default(0)
-
+  tabs         Tab[]
+  
   restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   orders     Order[]
   npsResponses NpsResponse[]
@@ -509,4 +723,89 @@ model NpsResponse {
   createdAt DateTime @default(now())
 
   @@map("nps_responses")
+}
+
+// ─────────────────────────────────────────────
+// CASH REGISTER (Sistema de Caixa)
+// ─────────────────────────────────────────────
+
+enum CashRegisterStatus {
+  OPEN
+  CLOSED
+}
+
+enum CashTransactionType {
+  SALE        // Venda (entrada)
+  WITHDRAWAL  // Sangria (saída)
+  SUPPLY      // Suprimento (entrada)
+}
+
+model CashRegister {
+  id            String             @id @default(cuid())
+  restaurantId  String
+  userId        String
+  status        CashRegisterStatus @default(OPEN)
+  
+  // Abertura
+  openedAt      DateTime           @default(now())
+  initialAmount Decimal            @db.Decimal(10, 2) // Valor inicial declarado
+  openNotes     String?
+  
+  // Fechamento
+  closedAt      DateTime?
+  closedBy      String?
+  
+  // Valores declarados no fechamento (pelo operador)
+  declaredCash    Decimal? @db.Decimal(10, 2)
+  declaredDebit   Decimal? @db.Decimal(10, 2)
+  declaredCredit  Decimal? @db.Decimal(10, 2)
+  declaredPix     Decimal? @db.Decimal(10, 2)
+  
+  // Valores calculados pelo sistema
+  expectedCash    Decimal? @db.Decimal(10, 2)
+  expectedDebit   Decimal? @db.Decimal(10, 2)
+  expectedCredit  Decimal? @db.Decimal(10, 2)
+  expectedPix     Decimal? @db.Decimal(10, 2)
+  
+  // Diferenças (quebra de caixa)
+  cashDifference   Decimal? @db.Decimal(10, 2)
+  debitDifference  Decimal? @db.Decimal(10, 2)
+  creditDifference Decimal? @db.Decimal(10, 2)
+  pixDifference    Decimal? @db.Decimal(10, 2)
+  
+  closeNotes String?
+  
+  // Relations
+  restaurant   Restaurant        @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  openedBy     User              @relation("CashRegisterOpenedBy", fields: [userId], references: [id])
+  closedByUser User?             @relation("CashRegisterClosedBy", fields: [closedBy], references: [id])
+  transactions CashTransaction[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([restaurantId, status])
+  @@index([restaurantId, openedAt])
+  @@map("cash_registers")
+}
+
+model CashTransaction {
+  id            String              @id @default(cuid())
+  registerId    String
+  type          CashTransactionType
+  amount        Decimal             @db.Decimal(10, 2)
+  paymentMethod PaymentMethod
+  description   String?
+  orderId       String?
+  userId        String?
+  
+  register CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  order    Order?        @relation(fields: [orderId], references: [id])
+  user     User?         @relation("CashTransactionUser", fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+  
+  @@index([registerId, type])
+  @@index([registerId, createdAt])
+  @@map("cash_transactions")
 }
