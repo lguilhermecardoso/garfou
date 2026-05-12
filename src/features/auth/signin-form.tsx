@@ -30,7 +30,11 @@ export function SignInForm({ callbackUrl }: Props) {
         redirect: false,
       });
       if (result?.error) {
-        setError("Email ou senha incorretos.");
+        if (result.error === "CredentialsSignin") {
+          setError("Email ou senha incorretos.");
+        } else {
+          setError(`Erro ao fazer login (${result.error}). Tente novamente.`);
+        }
       } else {
         router.push(callbackUrl);
         router.refresh();
@@ -44,14 +48,14 @@ export function SignInForm({ callbackUrl }: Props) {
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-500">
+          <div className="bg-primary-500 mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
             <UtensilsCrossed className="h-6 w-6 text-white" aria-hidden="true" />
           </div>
           <h1 className="text-2xl font-bold text-neutral-900">Entrar no GARFOU</h1>
           <p className="mt-1 text-sm text-neutral-500">Faça login na sua conta</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="rounded-2xl bg-white p-6 shadow-sm space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
           <Input
             label="Email"
             id="email"
@@ -98,7 +102,7 @@ export function SignInForm({ callbackUrl }: Props) {
 
         <p className="text-center text-sm text-neutral-500">
           Não tem conta?{" "}
-          <Link href="/auth/signup" className="font-medium text-primary-500 hover:underline">
+          <Link href="/auth/signup" className="text-primary-500 font-medium hover:underline">
             Criar conta
           </Link>
         </p>

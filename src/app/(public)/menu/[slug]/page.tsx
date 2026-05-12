@@ -27,6 +27,7 @@ export default async function DigitalMenuPage({ params }: Props) {
       id: true,
       name: true,
       logo: true,
+      phone: true,
       isOpen: true,
       settings: true,
     },
@@ -39,6 +40,7 @@ export default async function DigitalMenuPage({ params }: Props) {
       restaurantId={restaurant.id}
       restaurantName={restaurant.name}
       restaurantLogo={restaurant.logo}
+      restaurantPhone={restaurant.phone}
       isOpen={restaurant.isOpen}
     />
   );

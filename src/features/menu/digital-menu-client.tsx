@@ -3,13 +3,25 @@
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { formatCurrency } from "@/lib/utils";
-import { Search, ShoppingCart, Plus, Minus, UtensilsCrossed, X } from "lucide-react";
+import {
+  Search,
+  ShoppingCart,
+  Plus,
+  Minus,
+  UtensilsCrossed,
+  X,
+  QrCode,
+  Banknote,
+  CreditCard,
+  Truck,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
   restaurantId: string;
   restaurantName: string;
   restaurantLogo: string | null;
+  restaurantPhone: string | null;
   isOpen: boolean;
 }
 
@@ -36,14 +48,25 @@ interface MenuCategory {
 
 type DisplayProduct = MenuProduct & { categoryId: string };
 
-export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo, isOpen }: Props) {
+export function DigitalMenuClient({
+  restaurantId,
+  restaurantName,
+  restaurantLogo,
+  restaurantPhone,
+  isOpen,
+}: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"PIX" | "CASH" | "CARD" | "ON_DELIVERY">(
+    "PIX"
+  );
+  const [orderType, setOrderType] = useState<"DINE_IN" | "DELIVERY" | "TAKEOUT">("DINE_IN");
   const [orderPlaced, setOrderPlaced] = useState(false);
+  const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
 
   const { data: categories = [], isLoading } = useQuery<MenuCategory[]>({
     queryKey: ["public-menu", restaurantId],
@@ -63,7 +86,10 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
           i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i
         );
       }
-      return [...prev, { productId: product.id, name: product.name, price: product.price, quantity: 1 }];
+      return [
+        ...prev,
+        { productId: product.id, name: product.name, price: product.price, quantity: 1 },
+      ];
     });
   }
 
@@ -85,8 +111,8 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
   const displayed = search
     ? allProducts.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
     : activeCategory
-    ? allProducts.filter((p) => p.categoryId === activeCategory)
-    : null;
+      ? allProducts.filter((p) => p.categoryId === activeCategory)
+      : null;
 
   async function placeOrder() {
     if (cart.length === 0) return;
@@ -95,7 +121,10 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          type: "DINE_IN",
+          type: orderType,
+          paymentMethod,
+          customerName: customerName || undefined,
+          customerPhone: customerPhone || undefined,
           items: cart.map((i) => ({
             productId: i.productId,
             quantity: i.quantity,
@@ -104,7 +133,9 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
           })),
         }),
       });
+      const data = await res.json();
       if (res.ok) {
+        setPlacedOrderId(data.data?.id ?? null);
         setOrderPlaced(true);
         setCart([]);
         setIsCartOpen(false);
@@ -115,6 +146,10 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
   }
 
   if (orderPlaced) {
+    const waLink = restaurantPhone
+      ? `https://wa.me/55${restaurantPhone.replace(/\D/g, "")}?text=${encodeURIComponent("Olá! Acabei de fazer um pedido no cardápio digital.")}`
+      : null;
+
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-50 px-4 text-center">
         <div className="rounded-full bg-emerald-100 p-6">
@@ -126,7 +161,37 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
             Seu pedido foi enviado. Aguarde, estamos preparando tudo com carinho.
           </p>
         </div>
-        <Button onClick={() => setOrderPlaced(false)}>Fazer novo pedido</Button>
+
+        {paymentMethod === "PIX" && (
+          <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left">
+            <div className="mb-2 flex items-center gap-2">
+              <QrCode className="h-5 w-5 text-emerald-600" aria-hidden="true" />
+              <span className="font-semibold text-emerald-800">Pagamento via PIX</span>
+            </div>
+            <p className="text-sm text-emerald-700">
+              Efetue o pagamento pelo PIX e envie o comprovante para o restaurante.
+            </p>
+            {waLink && (
+              <a
+                href={waLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-green-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+              >
+                Enviar comprovante pelo WhatsApp
+              </a>
+            )}
+          </div>
+        )}
+
+        <Button
+          onClick={() => {
+            setOrderPlaced(false);
+            setPlacedOrderId(null);
+          }}
+        >
+          Fazer novo pedido
+        </Button>
       </div>
     );
   }
@@ -134,20 +199,22 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
   return (
     <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <header className="bg-white border-b border-neutral-100 px-4 py-4 sticky top-0 z-40">
+      <header className="sticky top-0 z-40 border-b border-neutral-100 bg-white px-4 py-4">
         <div className="mx-auto max-w-2xl">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               {restaurantLogo ? (
                 <img src={restaurantLogo} alt="" className="h-10 w-10 rounded-xl object-cover" />
               ) : (
-                <div className="h-10 w-10 rounded-xl bg-primary-100 flex items-center justify-center">
-                  <UtensilsCrossed className="h-5 w-5 text-primary-500" aria-hidden="true" />
+                <div className="bg-primary-100 flex h-10 w-10 items-center justify-center rounded-xl">
+                  <UtensilsCrossed className="text-primary-500 h-5 w-5" aria-hidden="true" />
                 </div>
               )}
               <div>
                 <h1 className="font-bold text-neutral-900">{restaurantName}</h1>
-                <span className={`text-xs font-medium ${isOpen ? "text-emerald-600" : "text-red-500"}`}>
+                <span
+                  className={`text-xs font-medium ${isOpen ? "text-emerald-600" : "text-red-500"}`}
+                >
                   {isOpen ? "● Aberto agora" : "● Fechado"}
                 </span>
               </div>
@@ -155,12 +222,12 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
             {isOpen && (
               <button
                 onClick={() => setIsCartOpen(true)}
-                className="relative rounded-xl bg-primary-500 p-2.5 text-white"
+                className="bg-primary-500 relative rounded-xl p-2.5 text-white"
                 aria-label={`Carrinho — ${cartCount} itens`}
               >
                 <ShoppingCart className="h-5 w-5" aria-hidden="true" />
                 {cartCount > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent-500 text-xs font-bold text-neutral-900">
+                  <span className="bg-accent-500 absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-neutral-900">
                     {cartCount}
                   </span>
                 )}
@@ -168,13 +235,16 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
             )}
           </div>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" aria-hidden="true" />
+            <Search
+              className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-400"
+              aria-hidden="true"
+            />
             <input
               type="search"
               placeholder="Buscar no cardápio..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-xl border border-neutral-200 bg-neutral-50 pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+              className="focus:ring-primary-400 w-full rounded-xl border border-neutral-200 bg-neutral-50 py-2.5 pr-4 pl-10 text-sm focus:ring-2 focus:outline-none"
               aria-label="Buscar produto"
             />
           </div>
@@ -183,8 +253,8 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
 
       {/* Categories */}
       {!search && (
-        <div className="bg-white border-b border-neutral-100 overflow-x-auto">
-          <div className="flex gap-2 px-4 py-2.5 max-w-2xl mx-auto">
+        <div className="overflow-x-auto border-b border-neutral-100 bg-white">
+          <div className="mx-auto flex max-w-2xl gap-2 px-4 py-2.5">
             <button
               onClick={() => setActiveCategory(null)}
               className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${!activeCategory ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600"}`}
@@ -208,26 +278,36 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
       <main className="mx-auto max-w-2xl px-4 py-4" id="main-content">
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-500" aria-label="Carregando..." />
+            <div
+              className="border-primary-200 border-t-primary-500 h-8 w-8 animate-spin rounded-full border-4"
+              aria-label="Carregando..."
+            />
           </div>
         ) : displayed ? (
           <div className="space-y-3">
             {displayed.map((product) => {
               const inCart = cart.find((i) => i.productId === product.id);
               return (
-                <div key={product.id} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
-                  <div className="h-16 w-16 shrink-0 rounded-lg bg-neutral-100 flex items-center justify-center">
+                <div
+                  key={product.id}
+                  className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+                >
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
                     <UtensilsCrossed className="h-6 w-6 text-neutral-300" aria-hidden="true" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-neutral-900 text-sm">{product.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-neutral-900">{product.name}</p>
                     {product.description && (
-                      <p className="mt-0.5 text-xs text-neutral-500 line-clamp-2">{product.description}</p>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">
+                        {product.description}
+                      </p>
                     )}
-                    <p className="mt-1 font-bold text-primary-500">{formatCurrency(product.price)}</p>
+                    <p className="text-primary-500 mt-1 font-bold">
+                      {formatCurrency(product.price)}
+                    </p>
                   </div>
                   {isOpen && (
-                    <div className="shrink-0 flex items-center gap-1.5">
+                    <div className="flex shrink-0 items-center gap-1.5">
                       {inCart ? (
                         <>
                           <button
@@ -237,10 +317,18 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
                           >
                             <Minus className="h-3 w-3" aria-hidden="true" />
                           </button>
-                          <span className="text-sm font-bold min-w-[1.25rem] text-center">{inCart.quantity}</span>
+                          <span className="min-w-[1.25rem] text-center text-sm font-bold">
+                            {inCart.quantity}
+                          </span>
                           <button
-                            onClick={() => addToCart({ id: product.id, name: product.name, price: product.price })}
-                            className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white"
+                            onClick={() =>
+                              addToCart({
+                                id: product.id,
+                                name: product.name,
+                                price: product.price,
+                              })
+                            }
+                            className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
                             aria-label={`Adicionar mais ${product.name}`}
                           >
                             <Plus className="h-3 w-3" aria-hidden="true" />
@@ -248,8 +336,10 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
                         </>
                       ) : (
                         <button
-                          onClick={() => addToCart({ id: product.id, name: product.name, price: product.price })}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white"
+                          onClick={() =>
+                            addToCart({ id: product.id, name: product.name, price: product.price })
+                          }
+                          className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
                           aria-label={`Adicionar ${product.name}`}
                         >
                           <Plus className="h-3 w-3" aria-hidden="true" />
@@ -270,31 +360,67 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
                   {cat.products.map((product) => {
                     const inCart = cart.find((i) => i.productId === product.id);
                     return (
-                      <div key={product.id} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
-                        <div className="h-16 w-16 shrink-0 rounded-lg bg-neutral-100 flex items-center justify-center">
-                          <UtensilsCrossed className="h-6 w-6 text-neutral-300" aria-hidden="true" />
+                      <div
+                        key={product.id}
+                        className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm"
+                      >
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-lg bg-neutral-100">
+                          <UtensilsCrossed
+                            className="h-6 w-6 text-neutral-300"
+                            aria-hidden="true"
+                          />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-neutral-900 text-sm">{product.name}</p>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-semibold text-neutral-900">{product.name}</p>
                           {product.description && (
-                            <p className="mt-0.5 text-xs text-neutral-500 line-clamp-2">{product.description}</p>
+                            <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">
+                              {product.description}
+                            </p>
                           )}
-                          <p className="mt-1 font-bold text-primary-500">{formatCurrency(product.price)}</p>
+                          <p className="text-primary-500 mt-1 font-bold">
+                            {formatCurrency(product.price)}
+                          </p>
                         </div>
                         {isOpen && (
-                          <div className="shrink-0 flex items-center gap-1.5">
+                          <div className="flex shrink-0 items-center gap-1.5">
                             {inCart ? (
                               <>
-                                <button onClick={() => removeFromCart(product.id)} className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200" aria-label={`Remover ${product.name}`}>
+                                <button
+                                  onClick={() => removeFromCart(product.id)}
+                                  className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200"
+                                  aria-label={`Remover ${product.name}`}
+                                >
                                   <Minus className="h-3 w-3" aria-hidden="true" />
                                 </button>
-                                <span className="text-sm font-bold min-w-[1.25rem] text-center">{inCart.quantity}</span>
-                                <button onClick={() => addToCart({ id: product.id, name: product.name, price: product.price })} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white" aria-label={`Adicionar mais ${product.name}`}>
+                                <span className="min-w-[1.25rem] text-center text-sm font-bold">
+                                  {inCart.quantity}
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    addToCart({
+                                      id: product.id,
+                                      name: product.name,
+                                      price: product.price,
+                                    })
+                                  }
+                                  className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
+                                  aria-label={`Adicionar mais ${product.name}`}
+                                >
                                   <Plus className="h-3 w-3" aria-hidden="true" />
                                 </button>
                               </>
                             ) : (
-                              <button onClick={() => addToCart({ id: product.id, name: product.name, price: product.price })} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white" aria-label={`Adicionar ${product.name}`}>
+                              <button
+                                onClick={() =>
+                                  addToCart({
+                                    id: product.id,
+                                    name: product.name,
+                                    price: product.price,
+                                  })
+                                }
+                                className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
+                                aria-label={`Adicionar ${product.name}`}
+                              >
                                 <Plus className="h-3 w-3" aria-hidden="true" />
                               </button>
                             )}
@@ -312,39 +438,58 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
 
       {/* Cart Drawer */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60" role="dialog" aria-modal="true" aria-label="Meu pedido">
-          <div className="rounded-t-2xl bg-white max-h-[85vh] flex flex-col">
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Meu pedido"
+        >
+          <div className="flex max-h-[85vh] flex-col rounded-t-2xl bg-white">
             <div className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
               <h2 className="text-lg font-bold text-neutral-900">Meu pedido</h2>
               <button onClick={() => setIsCartOpen(false)} aria-label="Fechar">
                 <X className="h-5 w-5 text-neutral-500" aria-hidden="true" />
               </button>
             </div>
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
+            <div className="flex-1 space-y-3 overflow-y-auto px-4 py-3">
               {cart.map((item) => (
                 <div key={item.productId} className="flex items-center justify-between">
                   <div>
                     <p className="text-sm font-semibold text-neutral-900">{item.name}</p>
-                    <p className="text-sm text-neutral-500">{formatCurrency(item.price)} × {item.quantity}</p>
+                    <p className="text-sm text-neutral-500">
+                      {formatCurrency(item.price)} × {item.quantity}
+                    </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <button onClick={() => removeFromCart(item.productId)} className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200" aria-label={`Remover ${item.name}`}>
+                    <button
+                      onClick={() => removeFromCart(item.productId)}
+                      className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200"
+                      aria-label={`Remover ${item.name}`}
+                    >
                       <Minus className="h-3 w-3" aria-hidden="true" />
                     </button>
-                    <span className="text-sm font-bold min-w-[1.5rem] text-center">{item.quantity}</span>
-                    <button onClick={() => addToCart({ id: item.productId, name: item.name, price: item.price })} className="flex h-7 w-7 items-center justify-center rounded-full bg-primary-500 text-white" aria-label={`Adicionar mais ${item.name}`}>
+                    <span className="min-w-[1.5rem] text-center text-sm font-bold">
+                      {item.quantity}
+                    </span>
+                    <button
+                      onClick={() =>
+                        addToCart({ id: item.productId, name: item.name, price: item.price })
+                      }
+                      className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
+                      aria-label={`Adicionar mais ${item.name}`}
+                    >
                       <Plus className="h-3 w-3" aria-hidden="true" />
                     </button>
                   </div>
                 </div>
               ))}
-              <div className="space-y-2 pt-2 border-t border-neutral-100">
+              <div className="space-y-2 border-t border-neutral-100 pt-2">
                 <input
                   type="text"
                   placeholder="Seu nome (opcional)"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  className="focus:ring-primary-400 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                   aria-label="Seu nome"
                 />
                 <input
@@ -352,17 +497,70 @@ export function DigitalMenuClient({ restaurantId, restaurantName, restaurantLogo
                   placeholder="WhatsApp (opcional)"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
-                  className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+                  className="focus:ring-primary-400 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                   aria-label="WhatsApp"
                 />
+              </div>
+
+              {/* Order type */}
+              <div className="border-t border-neutral-100 pt-2">
+                <p className="mb-2 text-xs font-semibold text-neutral-500">Como vai ser?</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {(
+                    [
+                      { value: "DINE_IN", label: "Comer aqui" },
+                      { value: "TAKEOUT", label: "Retirar" },
+                      { value: "DELIVERY", label: "Entrega" },
+                    ] as const
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      onClick={() => setOrderType(opt.value)}
+                      className={`rounded-lg border py-2 text-xs font-medium transition-colors ${orderType === opt.value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Payment method */}
+              <div className="border-t border-neutral-100 pt-2">
+                <p className="mb-2 text-xs font-semibold text-neutral-500">Forma de pagamento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { value: "PIX", label: "PIX", Icon: QrCode },
+                      { value: "CASH", label: "Dinheiro", Icon: Banknote },
+                      { value: "CARD", label: "Cartão no local", Icon: CreditCard },
+                      { value: "ON_DELIVERY", label: "Pagar na entrega", Icon: Truck },
+                    ] as const
+                  ).map(({ value, label, Icon }) => (
+                    <button
+                      key={value}
+                      onClick={() => setPaymentMethod(value)}
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${paymentMethod === value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
+                    >
+                      <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div className="border-t border-neutral-100 px-4 py-4">
               <div className="mb-4 flex items-center justify-between">
                 <span className="font-semibold text-neutral-700">Total</span>
-                <span className="text-xl font-bold text-neutral-900">{formatCurrency(cartTotal)}</span>
+                <span className="text-xl font-bold text-neutral-900">
+                  {formatCurrency(cartTotal)}
+                </span>
               </div>
-              <Button className="w-full" size="lg" onClick={placeOrder} disabled={cart.length === 0}>
+              <Button
+                className="w-full"
+                size="lg"
+                onClick={placeOrder}
+                disabled={cart.length === 0}
+              >
                 Confirmar pedido
               </Button>
             </div>

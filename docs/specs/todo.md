@@ -12,6 +12,8 @@
 - [ ] Complete delivery rules (zones/radius/fee) end-to-end UX + API checks
 - [ ] Complete operating-hours automatic open/close behavior end-to-end
 - [ ] Strengthen Stripe lifecycle handling and guardrails
+- [ ] Add `OrderPrintReceipt` unit tests (line wrapping, edge cases for long product names)
+- [ ] Add `OrderDetailModal` E2E test (confirm flow, print trigger)
 
 ## In Progress
 
@@ -26,6 +28,13 @@
 - [x] Home route now detects session and offers system access button
 - [x] Add db:seed script and Prisma seed runtime compatibility with adapter-pg
 - [x] Keep architecture status document updated with current baseline
+- [x] Fix MissingCSRF login error (skipCSRFCheck from @auth/core in src/lib/auth.ts)
+- [x] Fix TypeError on orders page (\_count.items → items.length)
+- [x] Implement Bematech MP-4200 58mm thermal receipt (order-print-receipt.tsx) - 48-col receipt builder, printOrder() iframe helper, OrderPrintReceipt screen preview
+- [x] Implement OrderDetailModal (order-detail-modal.tsx) - Accessible dialog, full receipt preview, Confirmar/Recusar PATCH actions, auto-print on confirm
+- [x] Wire OrderDetailModal into OrdersLiveTable (Eye button on all rows)
+- [x] Implement DashboardPendingOrders live widget (dashboard-pending-orders.tsx) - Replaces static "Pedidos recentes" card, polls every 8s, eye + confirm quick-actions
+- [x] Update dashboard page to use DashboardPendingOrders widget
 
 ## Rules to keep this file useful
 

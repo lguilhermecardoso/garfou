@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { Button } from "@/components/ui/button";
-import { formatDate, formatCurrency } from "@/lib/utils";
+
 import { Loader2, RefreshCw, ChefHat, CheckCheck } from "lucide-react";
 import { useEffect, useRef, useCallback, useState } from "react";
 
@@ -12,9 +12,10 @@ interface Props {
 }
 
 async function fetchKitchenOrders(restaurantId: string) {
-  const res = await fetch(`/api/restaurants/${restaurantId}/orders?status=CONFIRMADO,EM_PREPARO`, {
-    cache: "no-store",
-  });
+  const res = await fetch(
+    `/api/restaurants/${restaurantId}/orders?status=NOVO_PEDIDO,AGUARDANDO_CONFIRMACAO,CONFIRMADO,EM_PREPARO`,
+    { cache: "no-store" }
+  );
   if (!res.ok) throw new Error("Falha ao carregar pedidos");
   const json = await res.json();
   return json.orders as KitchenOrder[];
@@ -109,7 +110,11 @@ export default function KitchenScreen({ restaurantId }: Props) {
         (old) =>
           old
             ?.map((o) => (o.id === orderId ? { ...o, status } : o))
-            .filter((o) => ["CONFIRMADO", "EM_PREPARO"].includes(o.status)) ?? []
+            .filter((o) =>
+              ["NOVO_PEDIDO", "AGUARDANDO_CONFIRMACAO", "CONFIRMADO", "EM_PREPARO"].includes(
+                o.status
+              )
+            ) ?? []
       );
       return { prev };
     },
@@ -148,6 +153,9 @@ export default function KitchenScreen({ restaurantId }: Props) {
 
   const confirmedOrders = orders.filter((o) => o.status === "CONFIRMADO");
   const inPreparationOrders = orders.filter((o) => o.status === "EM_PREPARO");
+  const newOrders = orders.filter(
+    (o) => o.status === "NOVO_PEDIDO" || o.status === "AGUARDANDO_CONFIRMACAO"
+  );
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
@@ -180,6 +188,19 @@ export default function KitchenScreen({ restaurantId }: Props) {
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* New — need confirmation */}
+          {newOrders.map((order) => (
+            <KitchenCard
+              key={order.id}
+              order={order}
+              nowMs={nowMs}
+              onConfirm={() => updateStatus({ orderId: order.id, status: "CONFIRMADO" })}
+              onCancel={() => updateStatus({ orderId: order.id, status: "CANCELADO" })}
+              onStartPrep={() => updateStatus({ orderId: order.id, status: "EM_PREPARO" })}
+              onReady={() => updateStatus({ orderId: order.id, status: "PRONTO" })}
+              isPending={isPending}
+            />
+          ))}
           {/* Confirmed — need to start prep */}
           {confirmedOrders.map((order) => (
             <KitchenCard
@@ -211,25 +232,33 @@ export default function KitchenScreen({ restaurantId }: Props) {
 function KitchenCard({
   order,
   nowMs,
+  onConfirm,
+  onCancel,
   onStartPrep,
   onReady,
   isPending,
 }: {
   order: KitchenOrder;
   nowMs: number;
+  onConfirm?: () => void;
+  onCancel?: () => void;
   onStartPrep: () => void;
   onReady: () => void;
   isPending: boolean;
 }) {
+  const isAwaitingConfirmation =
+    order.status === "NOVO_PEDIDO" || order.status === "AGUARDANDO_CONFIRMACAO";
   const isNew = order.status === "CONFIRMADO";
   const elapsedMinutes = Math.floor((nowMs - new Date(order.createdAt).getTime()) / 60000);
 
   return (
     <article
       className={`rounded-xl border-2 p-4 transition-all ${
-        isNew
-          ? "border-accent-400 bg-neutral-900 shadow-[0_0_20px_rgba(245,155,5,0.2)]"
-          : "border-neutral-700 bg-neutral-900"
+        isAwaitingConfirmation
+          ? "animate-pulse-border border-red-500 bg-neutral-900 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
+          : isNew
+            ? "border-accent-400 bg-neutral-900 shadow-[0_0_20px_rgba(245,155,5,0.2)]"
+            : "border-neutral-700 bg-neutral-900"
       }`}
       aria-label={`Pedido #${order.orderNumber}`}
     >
@@ -237,6 +266,11 @@ function KitchenCard({
         <div>
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold">#{order.orderNumber}</span>
+            {isAwaitingConfirmation && (
+              <span className="animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                NOVO!
+              </span>
+            )}
             {isNew && (
               <span className="bg-accent-400 animate-pulse rounded-full px-2 py-0.5 text-xs font-bold text-neutral-900">
                 NOVO
@@ -291,7 +325,25 @@ function KitchenCard({
 
       {/* Actions */}
       <div className="flex gap-2">
-        {isNew ? (
+        {isAwaitingConfirmation ? (
+          <>
+            <Button
+              className="flex-1 bg-emerald-500 font-bold hover:bg-emerald-400"
+              onClick={onConfirm}
+              disabled={isPending}
+            >
+              Confirmar
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 border-red-500 font-bold text-red-400 hover:bg-red-500/10"
+              onClick={onCancel}
+              disabled={isPending}
+            >
+              Rejeitar
+            </Button>
+          </>
+        ) : isNew ? (
           <Button
             className="bg-accent-500 hover:bg-accent-400 flex-1 font-bold text-neutral-900"
             onClick={onStartPrep}

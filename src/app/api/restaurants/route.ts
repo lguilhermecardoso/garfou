@@ -21,32 +21,41 @@ export async function POST(req: Request) {
 
   const { name, phone, address, city, state } = parsed.data;
 
-  const baseSlug = generateSlug(name);
-  let slug = baseSlug;
-  let suffix = 0;
-  while (await prisma.restaurant.findUnique({ where: { slug } })) {
-    suffix++;
-    slug = `${baseSlug}-${suffix}`;
-  }
+  try {
+    const baseSlug = generateSlug(name);
+    let slug = baseSlug;
+    let suffix = 0;
+    while (await prisma.restaurant.findUnique({ where: { slug } })) {
+      suffix++;
+      slug = `${baseSlug}-${suffix}`;
+    }
 
-  const restaurant = await prisma.restaurant.create({
-    data: {
-      name,
-      slug,
-      phone,
-      address,
-      city,
-      state,
-      members: {
-        create: {
-          userId: session.user.id,
-          role: "OWNER",
+    const restaurant = await prisma.restaurant.create({
+      data: {
+        name,
+        slug,
+        phone,
+        address,
+        city,
+        state,
+        members: {
+          create: {
+            userId: session.user.id,
+            role: "OWNER",
+          },
         },
       },
-    },
-  });
+    });
 
-  return NextResponse.json({ data: restaurant }, { status: 201 });
+    return NextResponse.json({ data: restaurant }, { status: 201 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[POST /api/restaurants] erro:", message, err);
+    return NextResponse.json(
+      { error: "Erro ao criar restaurante", detail: message },
+      { status: 500 }
+    );
+  }
 }
 
 export async function GET() {
@@ -55,19 +64,28 @@ export async function GET() {
     return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
   }
 
-  const restaurants = await prisma.restaurant.findMany({
-    where: {
-      deletedAt: null,
-      members: { some: { userId: session.user.id } },
-    },
-    include: {
-      members: {
-        where: { userId: session.user.id },
-        select: { role: true },
+  try {
+    const restaurants = await prisma.restaurant.findMany({
+      where: {
+        deletedAt: null,
+        members: { some: { userId: session.user.id } },
       },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+      include: {
+        members: {
+          where: { userId: session.user.id },
+          select: { role: true },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
 
-  return NextResponse.json({ data: restaurants });
+    return NextResponse.json({ data: restaurants });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("[GET /api/restaurants] erro:", message, err);
+    return NextResponse.json(
+      { error: "Erro ao buscar restaurantes", detail: message },
+      { status: 500 }
+    );
+  }
 }

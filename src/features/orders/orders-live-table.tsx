@@ -1,0 +1,238 @@
+"use client";
+
+import { useEffect, useRef, useState, useCallback } from "react";
+import { OrderStatusBadge } from "@/components/shared/order-status-badge";
+import { OrderDetailModal } from "./order-detail-modal";
+import { formatCurrency, formatDate } from "@/lib/utils";
+import { CheckCircle, XCircle, RefreshCw, Eye } from "lucide-react";
+
+interface Order {
+  id: string;
+  orderNumber: number;
+  status: string;
+  type: string;
+  tableNumber: string | null;
+  total: number;
+  createdAt: string;
+  items: unknown[];
+}
+
+interface Props {
+  restaurantId: string;
+  initialStatus?: string;
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  NOVO_PEDIDO: "Novo Pedido",
+  AGUARDANDO_CONFIRMACAO: "Aguardando",
+  CONFIRMADO: "Confirmado",
+  EM_PREPARO: "Em preparo",
+  PRONTO: "Pronto",
+  SAIU_PARA_ENTREGA: "Saiu p/ entrega",
+  FINALIZADO: "Finalizado",
+  CANCELADO: "Cancelado",
+};
+
+const ALL_STATUSES = Object.keys(STATUS_LABELS);
+
+function playDoorbell() {
+  try {
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
+    gain.gain.setValueAtTime(0.4, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.6);
+  } catch {
+    // Web Audio not available
+  }
+}
+
+export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
+  const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [actioning, setActioning] = useState<string | null>(null);
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const knownIds = useRef<Set<string>>(new Set());
+
+  const fetchOrders = useCallback(async () => {
+    const qs = statusFilter ? `?status=${statusFilter}` : "";
+    const res = await fetch(`/api/restaurants/${restaurantId}/orders${qs}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const fetched: Order[] = data.orders ?? data.data ?? [];
+
+    // detect new orders and play sound
+    const newOnes = fetched.filter(
+      (o) =>
+        (o.status === "NOVO_PEDIDO" || o.status === "AGUARDANDO_CONFIRMACAO") &&
+        !knownIds.current.has(o.id)
+    );
+    if (newOnes.length > 0 && knownIds.current.size > 0) {
+      playDoorbell();
+    }
+    fetched.forEach((o) => knownIds.current.add(o.id));
+
+    setOrders(fetched);
+    setLoading(false);
+  }, [restaurantId, statusFilter]);
+
+  useEffect(() => {
+    knownIds.current = new Set();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchOrders();
+    const interval = setInterval(fetchOrders, 5000);
+    return () => clearInterval(interval);
+  }, [fetchOrders]);
+
+  async function patchStatus(orderId: string, status: string) {
+    setActioning(orderId);
+    await fetch(`/api/restaurants/${restaurantId}/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    setActioning(null);
+    fetchOrders();
+  }
+
+  return (
+    <>
+      {/* Order detail modal */}
+      <OrderDetailModal
+        orderId={selectedOrderId}
+        restaurantId={restaurantId}
+        onClose={() => setSelectedOrderId(null)}
+        onStatusChange={(id, newStatus) => {
+          setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o)));
+        }}
+      />
+
+      <div className="space-y-4">
+        {/* Status filter pills */}
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setStatusFilter("")}
+            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === "" ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+          >
+            Todos
+          </button>
+          {ALL_STATUSES.map((s) => (
+            <button
+              key={s}
+              onClick={() => setStatusFilter(s)}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === s ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+            >
+              {STATUS_LABELS[s]}
+            </button>
+          ))}
+        </div>
+
+        {/* Table */}
+        <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
+          {loading ? (
+            <div className="flex items-center justify-center gap-2 py-16 text-neutral-400">
+              <RefreshCw className="h-5 w-5 animate-spin" />
+              <span>Carregando pedidos...</span>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm" aria-label="Lista de pedidos">
+                <thead>
+                  <tr className="border-b border-neutral-100 bg-neutral-50">
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">#</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Status</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Tipo</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Mesa</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Itens</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Total</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Data</th>
+                    <th className="px-4 py-3 text-center font-semibold text-neutral-600">Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
+                        Nenhum pedido encontrado
+                      </td>
+                    </tr>
+                  ) : (
+                    orders.map((order) => {
+                      const isPending =
+                        order.status === "NOVO_PEDIDO" || order.status === "AGUARDANDO_CONFIRMACAO";
+                      return (
+                        <tr
+                          key={order.id}
+                          className={`border-b border-neutral-50 transition-colors ${isPending ? "bg-amber-50 hover:bg-amber-100" : "hover:bg-neutral-50"}`}
+                        >
+                          <td className="px-4 py-3 font-mono text-neutral-600">
+                            #{order.orderNumber}
+                          </td>
+                          <td className="px-4 py-3">
+                            <OrderStatusBadge status={order.status} />
+                          </td>
+                          <td className="px-4 py-3 text-neutral-600">
+                            {order.type.replace(/_/g, " ")}
+                          </td>
+                          <td className="px-4 py-3 text-neutral-600">{order.tableNumber ?? "—"}</td>
+                          <td className="px-4 py-3 text-neutral-600">{order.items.length}</td>
+                          <td className="px-4 py-3 font-semibold text-neutral-900">
+                            {formatCurrency(order.total)}
+                          </td>
+                          <td className="px-4 py-3 text-neutral-500">
+                            {formatDate(new Date(order.createdAt))}
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex justify-center gap-1">
+                              {/* View — always available */}
+                              <button
+                                onClick={() => setSelectedOrderId(order.id)}
+                                title="Ver pedido"
+                                className="rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              {/* Quick approve / reject for pending */}
+                              {isPending && (
+                                <>
+                                  <button
+                                    onClick={() => patchStatus(order.id, "CONFIRMADO")}
+                                    disabled={actioning === order.id}
+                                    title="Confirmar pedido"
+                                    className="rounded-lg bg-green-500 p-1.5 text-white transition-colors hover:bg-green-600 disabled:opacity-50"
+                                  >
+                                    <CheckCircle className="h-4 w-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => patchStatus(order.id, "CANCELADO")}
+                                    disabled={actioning === order.id}
+                                    title="Cancelar pedido"
+                                    className="rounded-lg bg-red-500 p-1.5 text-white transition-colors hover:bg-red-600 disabled:opacity-50"
+                                  >
+                                    <XCircle className="h-4 w-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+        <p className="text-right text-xs text-neutral-400">Atualização automática a cada 5s</p>
+      </div>
+    </>
+  );
+}

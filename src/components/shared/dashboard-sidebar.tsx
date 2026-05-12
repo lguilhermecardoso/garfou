@@ -16,6 +16,7 @@ import {
   Star,
   Tag,
   Truck,
+  MessageCircle,
 } from "lucide-react";
 
 interface Props {
@@ -34,6 +35,7 @@ const navItems = [
   { href: "/reports", label: "Relatórios", icon: BarChart3 },
   { href: "/coupons", label: "Cupons", icon: Tag },
   { href: "/delivery", label: "Entrega", icon: Truck },
+  { href: "/whatsapp", label: "WhatsApp", icon: MessageCircle },
   { href: "/nps", label: "NPS", icon: Star },
   { href: "/settings", label: "Configurações", icon: Settings },
 ];
@@ -49,7 +51,7 @@ export function DashboardSidebar({ restaurantId }: Props) {
     >
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-4">
-        <UtensilsCrossed className="h-6 w-6 text-primary-500" aria-hidden="true" />
+        <UtensilsCrossed className="text-primary-500 h-6 w-6" aria-hidden="true" />
         <span className="text-lg font-bold text-neutral-900">GARFOU</span>
       </div>
 
@@ -58,9 +60,7 @@ export function DashboardSidebar({ restaurantId }: Props) {
         <ul className="space-y-0.5" role="list">
           {navItems.map((item) => {
             const href = `${base}${item.href}`;
-            const isActive = item.href === ""
-              ? pathname === base
-              : pathname.startsWith(href);
+            const isActive = item.href === "" ? pathname === base : pathname.startsWith(href);
 
             return (
               <li key={item.href}>

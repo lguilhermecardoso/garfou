@@ -21,11 +21,6 @@ export const signInSchema = z.object({
 
 export const createRestaurantSchema = z.object({
   name: z.string().min(2, "Nome deve ter ao menos 2 caracteres"),
-  slug: z
-    .string()
-    .min(2)
-    .max(50)
-    .regex(/^[a-z0-9-]+$/, "Apenas letras minúsculas, números e hífens"),
   phone: z.string().optional(),
   address: z.string().optional(),
   city: z.string().optional(),
@@ -107,10 +102,11 @@ export const createFinanceEntrySchema = z.object({
   category: z.string().min(1),
   description: z.string().min(1),
   amount: z.number().positive(),
-  date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
-  paymentMethod: z
-    .enum(["CASH", "PIX", "CREDIT_CARD", "DEBIT_CARD"])
-    .optional(),
+  date: z
+    .string()
+    .datetime()
+    .or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)),
+  paymentMethod: z.enum(["CASH", "PIX", "CREDIT_CARD", "DEBIT_CARD"]).optional(),
 });
 
 // ─── NPS ─────────────────────────────────────────────────────

@@ -1,15 +1,10 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
-import {
-  ShoppingBag,
-  TrendingUp,
-  Clock,
-  XCircle,
-  DollarSign,
-} from "lucide-react";
+import { DashboardPendingOrders } from "@/features/orders/dashboard-pending-orders";
+import { ShoppingBag, TrendingUp, Clock, XCircle, DollarSign } from "lucide-react";
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
@@ -24,7 +19,7 @@ export default async function DashboardPage({ params }: Props) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const [todayOrders, pendingOrders] = await Promise.all([
+  const [todayOrders, pendingOrders, newOrdersCount] = await Promise.all([
     prisma.order.findMany({
       where: {
         restaurantId,
@@ -37,6 +32,12 @@ export default async function DashboardPage({ params }: Props) {
       where: {
         restaurantId,
         status: { in: ["NOVO_PEDIDO", "AGUARDANDO_CONFIRMACAO", "CONFIRMADO", "EM_PREPARO"] },
+      },
+    }),
+    prisma.order.count({
+      where: {
+        restaurantId,
+        status: { in: ["NOVO_PEDIDO", "AGUARDANDO_CONFIRMACAO"] },
       },
     }),
   ]);
@@ -90,6 +91,9 @@ export default async function DashboardPage({ params }: Props) {
         <p className="text-neutral-500">Visão geral de hoje</p>
       </div>
 
+      {/* Pending orders quick-action widget */}
+      <DashboardPendingOrders restaurantId={restaurantId} initialCount={newOrdersCount} />
+
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         {stats.map((stat) => (
@@ -98,9 +102,7 @@ export default async function DashboardPage({ params }: Props) {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-xs text-neutral-500">{stat.title}</p>
-                  <p className="mt-1 text-xl font-bold text-neutral-900">
-                    {stat.value}
-                  </p>
+                  <p className="mt-1 text-xl font-bold text-neutral-900">{stat.value}</p>
                 </div>
                 <div className={`rounded-lg p-2 ${stat.bg}`}>
                   <stat.icon className={`h-4 w-4 ${stat.color}`} aria-hidden="true" />
@@ -110,22 +112,6 @@ export default async function DashboardPage({ params }: Props) {
           </Card>
         ))}
       </div>
-
-      {/* Recent orders */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Pedidos recentes</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-neutral-500">
-            Veja a lista completa em{" "}
-            <a href={`/dashboard/${restaurantId}/orders`} className="text-primary-500 underline">
-              Pedidos
-            </a>
-            .
-          </p>
-        </CardContent>
-      </Card>
     </div>
   );
 }
