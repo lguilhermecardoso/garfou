@@ -99,43 +99,6 @@ async function main() {
 
   console.log("[seed] starting...");
 
-  // ── Clean up ALL restaurants owned by seed users ────────────────
-  const seedEmails = [
-    "owner@garfou.demo",
-    "manager@garfou.demo",
-    "waiter@garfou.demo",
-    "kitchen@garfou.demo",
-    "cashier@garfou.demo",
-  ];
-  const existingMembers = await prisma.userRestaurant.findMany({
-    where: {
-      role: UserRole.OWNER,
-      user: { email: { in: seedEmails } },
-    },
-    select: { restaurantId: true },
-  });
-  if (existingMembers.length) {
-    const ids = existingMembers.map((m) => m.restaurantId);
-    console.log(`[seed] removing ${ids.length} previous demo restaurant(s)...`);
-    for (const rId of ids) {
-      // Delete in FK-safe order (several relations lack onDelete: Cascade)
-      const orders = await prisma.order.findMany({ where: { restaurantId: rId }, select: { id: true } });
-      const orderIds = orders.map((o) => o.id);
-      if (orderIds.length) {
-        const items = await prisma.orderItem.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } });
-        const itemIds = items.map((i) => i.id);
-        if (itemIds.length) {
-          await prisma.orderItemAddon.deleteMany({ where: { orderItemId: { in: itemIds } } });
-          await prisma.orderItem.deleteMany({ where: { id: { in: itemIds } } });
-        }
-        await prisma.npsResponse.deleteMany({ where: { orderId: { in: orderIds } } });
-        await prisma.financeEntry.deleteMany({ where: { orderId: { in: orderIds } } });
-        await prisma.order.deleteMany({ where: { restaurantId: rId } });
-      }
-      await prisma.restaurant.delete({ where: { id: rId } });
-    }
-  }
-
   // ── Users ────────────────────────────────────────────────────────
   const users = {
     owner: await upsertUser({ name: "Alice Donati", email: "owner@garfou.demo", password: "Owner123!" }),
@@ -145,9 +108,34 @@ async function main() {
     cashier: await upsertUser({ name: "Eva Rocha", email: "cashier@garfou.demo", password: "Cashier123!" }),
   };
 
-  // ── Restaurant ───────────────────────────────────────────────────
-  const restaurant = await prisma.restaurant.create({
-    data: {
+  // ── Restaurant (UPSERT to keep same ID) ──────────────────────────
+  const restaurant = await prisma.restaurant.upsert({
+    where: { slug: DEMO_SLUG },
+    update: {
+      name: DEMO_NAME,
+      logo: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400",
+      phone: "+55 11 93333-4444",
+      address: "Rua das Palmeiras, 245",
+      city: "Sao Paulo",
+      state: "SP",
+      isOpen: true,
+      subscriptionStatus: SubscriptionStatus.ACTIVE,
+      stripeCustomerId: "cus_demo_garfou_prime",
+      stripeSubscriptionId: "sub_demo_garfou_enterprise",
+      trialEndsAt: new Date("2027-01-01T00:00:00.000Z"),
+      settings: {
+        plan: "ENTERPRISE",
+        approvalMode: "MANUAL",
+        autoPrint: true,
+        kitchenPollingSeconds: 3,
+        waiterPollingSeconds: 5,
+        dashboardPollingSeconds: 30,
+        theme: "premium-red",
+        currency: "BRL",
+        timezone: "America/Sao_Paulo",
+      },
+    },
+    create: {
       name: DEMO_NAME,
       slug: DEMO_SLUG,
       logo: "https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400",
@@ -161,7 +149,7 @@ async function main() {
       stripeSubscriptionId: "sub_demo_garfou_enterprise",
       trialEndsAt: new Date("2027-01-01T00:00:00.000Z"),
       settings: {
-        plan: "ENTERPRISE", // Plano Enterprise permite múltiplos restaurantes
+        plan: "ENTERPRISE",
         approvalMode: "MANUAL",
         autoPrint: true,
         kitchenPollingSeconds: 3,
@@ -174,6 +162,69 @@ async function main() {
     },
   });
   const rId = restaurant.id;
+
+  // ── Clean existing data (keep restaurant) ────────────────────────
+  console.log(`[seed] cleaning existing data for restaurant ${rId}...`);
+  const orders = await prisma.order.findMany({ where: { restaurantId: rId }, select: { id: true } });
+  const orderIds = orders.map((o) => o.id);
+  if (orderIds.length) {
+    const items = await prisma.orderItem.findMany({ where: { orderId: { in: orderIds } }, select: { id: true } });
+    const itemIds = items.map((i) => i.id);
+    if (itemIds.length) {
+      await prisma.orderItemAddon.deleteMany({ where: { orderItemId: { in: itemIds } } });
+      await prisma.orderItemSelectedOption.deleteMany({ where: { orderItemId: { in: itemIds } } });
+      await prisma.orderItemSplit.deleteMany({ where: { orderItemId: { in: itemIds } } });
+      await prisma.orderItem.deleteMany({ where: { id: { in: itemIds } } });
+    }
+    await prisma.npsResponse.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.financeEntry.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.order.deleteMany({ where: { restaurantId: rId } });
+  }
+  // Clean cash registers
+  const cashRegisters = await prisma.cashRegister.findMany({ where: { restaurantId: rId }, select: { id: true } });
+  const registerIds = cashRegisters.map((r) => r.id);
+  if (registerIds.length) {
+    await prisma.cashTransaction.deleteMany({ where: { registerId: { in: registerIds } } });
+    await prisma.cashRegister.deleteMany({ where: { restaurantId: rId } });
+  }
+  // Clean inventory
+  const inventoryItems = await prisma.inventoryItem.findMany({ where: { restaurantId: rId }, select: { id: true } });
+  const itemIds = inventoryItems.map((i) => i.id);
+  if (itemIds.length) {
+    await prisma.inventoryMovement.deleteMany({ where: { itemId: { in: itemIds } } });
+    await prisma.inventoryItem.deleteMany({ where: { restaurantId: rId } });
+  }
+  // Clean menu
+  const products = await prisma.product.findMany({ where: { restaurantId: rId }, select: { id: true } });
+  const productIds = products.map((p) => p.id);
+  if (productIds.length) {
+    await prisma.productAddon.deleteMany({ where: { productId: { in: productIds } } });
+    await prisma.productSplitFlavor.deleteMany({
+      where: {
+        OR: [
+          { sourceProductId: { in: productIds } },
+          { flavorProductId: { in: productIds } },
+        ],
+      },
+    });
+    await prisma.product.deleteMany({ where: { restaurantId: rId } });
+  }
+  const modifierGroups = await prisma.modifierGroup.findMany({ where: { restaurantId: rId }, select: { id: true } });
+  const groupIds = modifierGroups.map((g) => g.id);
+  if (groupIds.length) {
+    await prisma.modifierOption.deleteMany({ where: { groupId: { in: groupIds } } });
+    await prisma.modifierGroup.deleteMany({ where: { restaurantId: rId } });
+  }
+  await prisma.category.deleteMany({ where: { restaurantId: rId } });
+  await prisma.tab.deleteMany({ where: { restaurantId: rId } });
+  await prisma.table.deleteMany({ where: { restaurantId: rId } });
+  await prisma.coupon.deleteMany({ where: { restaurantId: rId } });
+  await prisma.customer.deleteMany({ where: { restaurantId: rId } });
+  await prisma.deliveryZone.deleteMany({ where: { restaurantId: rId } });
+  await prisma.financeEntry.deleteMany({ where: { restaurantId: rId } });
+  await prisma.operatingHours.deleteMany({ where: { restaurantId: rId } });
+  await prisma.userRestaurant.deleteMany({ where: { restaurantId: rId } });
+  console.log("[seed] cleaning done ✓");
 
   await prisma.userRestaurant.createMany({
     data: [

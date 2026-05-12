@@ -14,7 +14,8 @@ const moveSchema = z.object({
 export async function POST(req: Request, { params }: Params) {
   const { restaurantId, itemId } = await params;
   const access = await requireRole(restaurantId, "MANAGER");
-  if ("error" in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if ("error" in access)
+    return NextResponse.json({ error: access.error }, { status: access.status });
 
   const body = await req.json();
   const parsed = moveSchema.safeParse(body);
@@ -30,8 +31,17 @@ export async function POST(req: Request, { params }: Params) {
   });
   if (!item) return NextResponse.json({ error: "Item não encontrado" }, { status: 404 });
 
-  const delta = type === "OUT" ? -Math.abs(quantity) : Math.abs(quantity);
-  const newStock = Number(item.currentStock) + delta;
+  // Calcular novo estoque baseado no tipo de movimento
+  let newStock: number;
+  if (type === "ADJUSTMENT") {
+    // ADJUSTMENT substitui o valor (não soma)
+    newStock = Math.abs(quantity);
+  } else {
+    // IN adiciona, OUT subtrai
+    const delta = type === "OUT" ? -Math.abs(quantity) : Math.abs(quantity);
+    newStock = Number(item.currentStock) + delta;
+  }
+
   if (newStock < 0) {
     return NextResponse.json({ error: "Estoque insuficiente" }, { status: 422 });
   }

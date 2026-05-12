@@ -229,6 +229,7 @@ export const createCouponSchema = z.object({
     .min(3)
     .max(20)
     .regex(/^[A-Z0-9]+$/, "Apenas letras maiúsculas e números"),
+  description: z.string().optional(),
   type: z.enum(["PERCENTAGE", "FIXED_AMOUNT"]),
   value: z.number().positive(),
   minOrderValue: z.number().default(0),

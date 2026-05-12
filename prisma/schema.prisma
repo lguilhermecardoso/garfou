@@ -685,6 +685,7 @@ model Coupon {
   id               String  @id @default(cuid())
   restaurantId     String
   code             String
+  description      String?
   type             String  // PERCENTAGE | FIXED_AMOUNT
   value            Decimal @db.Decimal(10, 2)
   minOrderValue    Decimal @db.Decimal(10, 2) @default(0)
