@@ -10,26 +10,62 @@ import { useEffect, useRef, useCallback, useState } from "react";
 
 interface Props {
   restaurantId: string;
+  bearerToken?: string; // Se fornecido, usa BFF
 }
 
-async function fetchKitchenOrders(restaurantId: string) {
-  const res = await fetch(
-    `/api/restaurants/${restaurantId}/orders?status=NOVO_PEDIDO,AGUARDANDO_CONFIRMACAO,CONFIRMADO,EM_PREPARO`,
-    { cache: "no-store" }
-  );
-  if (!res.ok) throw new Error("Falha ao carregar pedidos");
-  const json = await res.json();
-  return json.orders as KitchenOrder[];
+async function fetchKitchenOrders(restaurantId: string, bearerToken?: string) {
+  if (bearerToken) {
+    // BFF mode
+    const res = await fetch(
+      `/api/bff/orders?status=NOVO_PEDIDO,AGUARDANDO_CONFIRMACAO,CONFIRMADO,EM_PREPARO`,
+      {
+        headers: { Authorization: `Bearer ${bearerToken}` },
+        cache: "no-store",
+      }
+    );
+    if (!res.ok) throw new Error("Falha ao carregar pedidos");
+    const json = await res.json();
+    return json.data as KitchenOrder[];
+  } else {
+    // Normal mode (via NextAuth)
+    const res = await fetch(
+      `/api/restaurants/${restaurantId}/orders?status=NOVO_PEDIDO,AGUARDANDO_CONFIRMACAO,CONFIRMADO,EM_PREPARO`,
+      { cache: "no-store" }
+    );
+    if (!res.ok) throw new Error("Falha ao carregar pedidos");
+    const json = await res.json();
+    return json.orders as KitchenOrder[];
+  }
 }
 
-async function updateOrderStatus(restaurantId: string, orderId: string, status: string) {
-  const res = await fetch(`/api/restaurants/${restaurantId}/orders/${orderId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
-  if (!res.ok) throw new Error("Falha ao atualizar pedido");
-  return res.json();
+async function updateOrderStatus(
+  restaurantId: string,
+  orderId: string,
+  status: string,
+  bearerToken?: string
+) {
+  if (bearerToken) {
+    // BFF mode
+    const res = await fetch(`/api/bff/orders/${orderId}`, {
+      method: "PATCH",
+      headers: {
+        Authorization: `Bearer ${bearerToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Falha ao atualizar pedido");
+    return res.json();
+  } else {
+    // Normal mode (via NextAuth)
+    const res = await fetch(`/api/restaurants/${restaurantId}/orders/${orderId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (!res.ok) throw new Error("Falha ao atualizar pedido");
+    return res.json();
+  }
 }
 
 interface KitchenOrder {
@@ -49,7 +85,7 @@ interface KitchenOrder {
   }[];
 }
 
-export default function KitchenScreen({ restaurantId }: Props) {
+export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
   const queryClient = useQueryClient();
   const prevCountRef = useRef(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -65,8 +101,8 @@ export default function KitchenScreen({ restaurantId }: Props) {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["kitchen-orders", restaurantId],
-    queryFn: () => fetchKitchenOrders(restaurantId),
+    queryKey: ["kitchen-orders", restaurantId, bearerToken ? "bff" : "auth"],
+    queryFn: () => fetchKitchenOrders(restaurantId, bearerToken),
     refetchInterval: 3000, // Poll every 3 seconds
     staleTime: 2000,
   });
@@ -102,12 +138,13 @@ export default function KitchenScreen({ restaurantId }: Props) {
 
   const { mutate: updateStatus, isPending } = useMutation({
     mutationFn: ({ orderId, status }: { orderId: string; status: string }) =>
-      updateOrderStatus(restaurantId, orderId, status),
+      updateOrderStatus(restaurantId, orderId, status, bearerToken),
     onMutate: async ({ orderId, status }) => {
-      await queryClient.cancelQueries({ queryKey: ["kitchen-orders", restaurantId] });
-      const prev = queryClient.getQueryData<KitchenOrder[]>(["kitchen-orders", restaurantId]);
+      const queryKey = ["kitchen-orders", restaurantId, bearerToken ? "bff" : "auth"];
+      await queryClient.cancelQueries({ queryKey });
+      const prev = queryClient.getQueryData<KitchenOrder[]>(queryKey);
       queryClient.setQueryData<KitchenOrder[]>(
-        ["kitchen-orders", restaurantId],
+        queryKey,
         (old) =>
           old
             ?.map((o) => (o.id === orderId ? { ...o, status } : o))
@@ -117,7 +154,7 @@ export default function KitchenScreen({ restaurantId }: Props) {
               )
             ) ?? []
       );
-      return { prev };
+      return { prev, queryKey };
     },
     onSuccess: (_, { status }) => {
       const statusLabel =
@@ -125,13 +162,14 @@ export default function KitchenScreen({ restaurantId }: Props) {
       toast.success(`Pedido ${statusLabel}!`);
     },
     onError: (_err, _vars, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(["kitchen-orders", restaurantId], ctx.prev);
+      if (ctx?.prev && ctx?.queryKey) {
+        queryClient.setQueryData(ctx.queryKey, ctx.prev);
       }
       toast.error("Erro ao atualizar pedido.");
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ["kitchen-orders", restaurantId] });
+      const queryKey = ["kitchen-orders", restaurantId, bearerToken ? "bff" : "auth"];
+      queryClient.invalidateQueries({ queryKey });
     },
   });
 

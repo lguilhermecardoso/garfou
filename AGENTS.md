@@ -360,10 +360,57 @@ const order = await prisma.order.findFirst({
 | Multi-tenancy         | `docs/multi-tenancy/strategy.md`      |
 | Realtime strategy     | `docs/realtime/strategy.md`           |
 | Deploy (Vercel)       | `docs/deploy/vercel.md`               |
+| Devices (PIN system)  | `DEVICES.md`                          |
 
 ---
 
-## 10. What Is NOT Done (known gaps)
+## 10. Device System - PIN-Based Authentication (COMPLETED 2026-05-13)
+
+**Purpose:** Allow tablets (waiters) and TVs (kitchen) to access fullscreen apps securely without traditional login.
+
+**Solution:** Industry-standard PIN system (6-digit temporary codes, 10-minute expiration)
+
+### Key Features
+
+- ✅ **Manager generates PIN** from dashboard → auto-opens activation page in new tab
+- ✅ **Worker types 6-digit PIN** → instant activation, vinculado ao restaurante
+- ✅ **Session expires** in 10 minutes (configurable), revalidated every 30 seconds
+- ✅ **Fullscreen apps** without sidebar/header, optimized for tablets/TVs
+- ✅ **Multi-tenancy secure** - impossible to access another restaurant's data
+
+### Architecture
+
+**Database:** `DeviceSession` model with `pin`, `restaurantId`, `type (WAITER|KITCHEN)`, `expiresAt`
+
+**APIs:**
+
+- POST `/api/restaurants/[restaurantId]/devices/generate` - Generate PIN (MANAGER+)
+- POST `/api/devices/activate` - Validate PIN and activate device (PUBLIC)
+- GET `/api/devices/validate?sessionId=xxx` - Check if session still valid (PUBLIC)
+- DELETE `/api/devices/validate?sessionId=xxx` - Logout device (PUBLIC)
+
+**Pages:**
+
+- `/waiter-app/activate` - PIN entry page (blue theme)
+- `/waiter-app/[slug]` - Fullscreen waiter app
+- `/kitchen-app/activate` - PIN entry page (orange theme)
+- `/kitchen-app/[slug]` - Fullscreen kitchen display
+
+**Component:** `DevicePinModal` - Dashboard widget to generate PINs
+
+**Security:**
+
+- PIN expires after 10 minutes
+- PIN can only be used once (marked as `activatedAt` after use)
+- Session revalidated every 30 seconds on client
+- All requests filtered by `restaurantId` from session
+- Public routes configured in `auth.config.ts`
+
+**Full Documentation:** See `DEVICES.md` for complete architecture, UX flows, and usage guide.
+
+---
+
+## 11. What Is NOT Done (known gaps)
 
 - **Print Agent daemon** — local Node/Electron app for silent ESC/POS printing; only architecture
   documented (`docs/printing/architecture.md`). `order.printConfirmed` / `printedAt` exist in DB

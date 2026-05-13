@@ -19,6 +19,7 @@ import {
 interface Props {
   restaurantId: string;
   tableNumber?: string;
+  bearerToken?: string; // Se fornecido, usa BFF
 }
 
 interface MenuCategory {
@@ -48,7 +49,7 @@ interface TabSummary {
 
 type DisplayProduct = MenuProductData & { categoryId: string; categoryName: string };
 
-export default function WaiterApp({ restaurantId, tableNumber }: Props) {
+export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Props) {
   const queryClient = useQueryClient();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [search, setSearch] = useState("");
@@ -64,31 +65,61 @@ export default function WaiterApp({ restaurantId, tableNumber }: Props) {
   const [isOpeningTab, setIsOpeningTab] = useState(false);
 
   const { data: categories = [], isLoading } = useQuery<MenuCategory[]>({
-    queryKey: ["menu", restaurantId],
+    queryKey: ["menu", restaurantId, bearerToken ? "bff" : "auth"],
     queryFn: async () => {
-      const res = await fetch(`/api/restaurants/${restaurantId}/menu?includeInactive=false`);
-      const json = await res.json();
-      return (json.data ?? []) as MenuCategory[];
+      if (bearerToken) {
+        // BFF mode
+        const res = await fetch(`/api/bff/menu`, {
+          headers: { Authorization: `Bearer ${bearerToken}` },
+        });
+        const json = await res.json();
+        return (json.data ?? []) as MenuCategory[];
+      } else {
+        // Normal mode
+        const res = await fetch(`/api/restaurants/${restaurantId}/menu?includeInactive=false`);
+        const json = await res.json();
+        return (json.data ?? []) as MenuCategory[];
+      }
     },
     staleTime: 30_000,
   });
 
   const { data: tables = [] } = useQuery<DiningTable[]>({
-    queryKey: ["tables", restaurantId],
+    queryKey: ["tables", restaurantId, bearerToken ? "bff" : "auth"],
     queryFn: async () => {
-      const response = await fetch(`/api/restaurants/${restaurantId}/tables?isActive=true`);
-      if (!response.ok) throw new Error("Falha ao carregar mesas");
-      return response.json() as Promise<DiningTable[]>;
+      if (bearerToken) {
+        // BFF mode
+        const response = await fetch(`/api/bff/tables`, {
+          headers: { Authorization: `Bearer ${bearerToken}` },
+        });
+        if (!response.ok) throw new Error("Falha ao carregar mesas");
+        return response.json() as Promise<DiningTable[]>;
+      } else {
+        // Normal mode
+        const response = await fetch(`/api/restaurants/${restaurantId}/tables?isActive=true`);
+        if (!response.ok) throw new Error("Falha ao carregar mesas");
+        return response.json() as Promise<DiningTable[]>;
+      }
     },
     staleTime: 10_000,
   });
 
   const { data: tabs = [], refetch: refetchTabs } = useQuery<TabSummary[]>({
-    queryKey: ["tabs", restaurantId],
+    queryKey: ["tabs", restaurantId, bearerToken ? "bff" : "auth"],
     queryFn: async () => {
-      const response = await fetch(`/api/restaurants/${restaurantId}/tabs?status=OPEN`);
-      if (!response.ok) throw new Error("Falha ao carregar comandas");
-      return response.json() as Promise<TabSummary[]>;
+      if (bearerToken) {
+        // BFF mode
+        const response = await fetch(`/api/bff/tabs?status=OPEN`, {
+          headers: { Authorization: `Bearer ${bearerToken}` },
+        });
+        if (!response.ok) throw new Error("Falha ao carregar comandas");
+        return response.json() as Promise<TabSummary[]>;
+      } else {
+        // Normal mode
+        const response = await fetch(`/api/restaurants/${restaurantId}/tabs?status=OPEN`);
+        if (!response.ok) throw new Error("Falha ao carregar comandas");
+        return response.json() as Promise<TabSummary[]>;
+      }
     },
     staleTime: 5_000,
     refetchInterval: 10_000,
@@ -196,14 +227,20 @@ export default function WaiterApp({ restaurantId, tableNumber }: Props) {
         return;
       }
 
-      const tabResponse = await fetch(`/api/restaurants/${restaurantId}/tabs`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          tableId: openTabMode === "table" ? selectedTableId : undefined,
-          guestCustomerName: openTabMode === "customer" ? customerName.trim() : undefined,
-        }),
-      });
+      const tabResponse = await fetch(
+        bearerToken ? `/api/bff/tabs` : `/api/restaurants/${restaurantId}/tabs`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
+          },
+          body: JSON.stringify({
+            tableId: openTabMode === "table" ? selectedTableId : undefined,
+            guestCustomerName: openTabMode === "customer" ? customerName.trim() : undefined,
+          }),
+        }
+      );
 
       const tabJson = await tabResponse.json();
       if (!tabResponse.ok) {
@@ -212,7 +249,9 @@ export default function WaiterApp({ restaurantId, tableNumber }: Props) {
 
       await Promise.all([
         refetchTabs(),
-        queryClient.invalidateQueries({ queryKey: ["tables", restaurantId] }),
+        queryClient.invalidateQueries({
+          queryKey: ["tables", restaurantId, bearerToken ? "bff" : "auth"],
+        }),
       ]);
 
       setActiveTabId(tabJson.id);
@@ -231,39 +270,46 @@ export default function WaiterApp({ restaurantId, tableNumber }: Props) {
   async function submitOrder() {
     if (cart.length === 0 || !activeTab) return;
     try {
-      const res = await fetch(`/api/restaurants/${restaurantId}/orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "DINE_IN",
-          tabId: activeTab.id,
-          tableNumber: activeTab.table?.identifier,
-          customerId: activeTab.customer?.id,
-          items: cart.map((i) => ({
-            productId: i.productId,
-            quantity: i.quantity,
-            notes: i.notes,
-            selectedOptions: i.selectedOptions.map((option) => ({
-              optionId: option.optionId,
-              quantity: option.quantity,
-              isRemoval: option.isRemoval,
+      const res = await fetch(
+        bearerToken ? `/api/bff/orders` : `/api/restaurants/${restaurantId}/orders`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
+          },
+          body: JSON.stringify({
+            type: "DINE_IN",
+            tabId: activeTab.id,
+            tableNumber: activeTab.table?.identifier,
+            customerId: activeTab.customer?.id,
+            items: cart.map((i) => ({
+              productId: i.productId,
+              quantity: i.quantity,
+              notes: i.notes,
+              selectedOptions: i.selectedOptions.map((option) => ({
+                optionId: option.optionId,
+                quantity: option.quantity,
+                isRemoval: option.isRemoval,
+              })),
+              splits: i.splits.map((split) => ({
+                splitIndex: split.splitIndex,
+                flavorProductId: split.flavorProductId,
+              })),
+              addons: [],
             })),
-            splits: i.splits.map((split) => ({
-              splitIndex: split.splitIndex,
-              flavorProductId: split.flavorProductId,
-            })),
-            addons: [],
-          })),
-        }),
-      });
+          }),
+        }
+      );
       const json = await res.json();
       if (res.ok) {
         setCart([]);
         setIsCartOpen(false);
 
         // Invalida cache e força refetch para atualizar total da comanda
+        const queryKeyMode = bearerToken ? "bff" : "auth";
         await Promise.all([
-          queryClient.invalidateQueries({ queryKey: ["tabs", restaurantId] }),
+          queryClient.invalidateQueries({ queryKey: ["tabs", restaurantId, queryKeyMode] }),
           queryClient.invalidateQueries({ queryKey: ["pos-tabs", restaurantId] }),
         ]);
 

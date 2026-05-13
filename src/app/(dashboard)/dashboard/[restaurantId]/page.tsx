@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { DashboardPendingOrders } from "@/features/orders/dashboard-pending-orders";
+import DeviceTokensManager from "@/features/devices/device-tokens-manager";
 import { ShoppingBag, TrendingUp, Clock, XCircle, DollarSign } from "lucide-react";
 
 interface Props {
@@ -93,6 +94,20 @@ export default async function DashboardPage({ params }: Props) {
 
       {/* Pending orders quick-action widget */}
       <DashboardPendingOrders restaurantId={restaurantId} initialCount={newOrdersCount} />
+
+      {/* Dispositivos - Apps Fullscreen */}
+      <Card>
+        <CardContent className="space-y-4 p-6">
+          <div>
+            <h3 className="text-lg font-semibold text-neutral-900">Tokens de Acesso</h3>
+            <p className="text-sm text-neutral-500">
+              Tokens permanentes para conectar múltiplos tablets/TVs nos apps Garçom e Cozinha
+            </p>
+          </div>
+
+          <DeviceTokensManager restaurantId={restaurantId} />
+        </CardContent>
+      </Card>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

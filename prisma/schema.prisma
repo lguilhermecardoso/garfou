@@ -30,6 +30,7 @@ model User {
   cashRegistersOpened  CashRegister[]      @relation("CashRegisterOpenedBy")
   cashRegistersClosed  CashRegister[]      @relation("CashRegisterClosedBy")
   cashTransactions     CashTransaction[]   @relation("CashTransactionUser")
+  deviceTokensCreated  DeviceToken[]       @relation("DeviceTokenCreator")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -137,6 +138,8 @@ model Restaurant {
   coupons         Coupon[]
   npsResponses    NpsResponse[]
   cashRegisters   CashRegister[]
+  deviceTokens    DeviceToken[]    @relation("RestaurantDeviceTokens")
+  deviceSessions  DeviceSession[]  @relation("RestaurantDeviceSessions")
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -809,4 +812,55 @@ model CashTransaction {
   @@index([registerId, type])
   @@index([registerId, createdAt])
   @@map("cash_transactions")
+}
+
+// ─────────────────────────────────────────────
+// Device Sessions (PIN-based authentication for tablets/TVs)
+// ─────────────────────────────────────────────
+
+// ─────────────────────────────────────────────
+// DEVICE TOKENS (Permanent, reusable authentication)
+// ─────────────────────────────────────────────
+
+model DeviceToken {
+  id           String  @id @default(cuid())
+  restaurantId String
+  token        String  @unique // 6-digit token (e.g., "123456")
+  type         String  // WAITER | KITCHEN
+  isActive     Boolean @default(true)
+  createdBy    String  // userId who generated the token
+  
+  restaurant Restaurant      @relation("RestaurantDeviceTokens", fields: [restaurantId], references: [id], onDelete: Cascade)
+  creator    User             @relation("DeviceTokenCreator", fields: [createdBy], references: [id])
+  sessions   DeviceSession[]  // Multiple devices can use the same token
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([restaurantId, type, isActive])
+  @@index([token, isActive])
+  @@map("device_tokens")
+}
+
+model DeviceSession {
+  id           String   @id @default(cuid())
+  restaurantId String
+  tokenId      String   // FK to DeviceToken
+  bearerToken  String?  @unique // Bearer token for BFF authentication (generated at activation)
+  deviceInfo   String?  // User agent, IP, browser fingerprint
+  activatedAt  DateTime @default(now())
+  lastSeenAt   DateTime @default(now()) // Updated on each validation
+  isActive     Boolean  @default(true)
+  
+  restaurant Restaurant  @relation("RestaurantDeviceSessions", fields: [restaurantId], references: [id], onDelete: Cascade)
+  token      DeviceToken @relation(fields: [tokenId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tokenId, isActive])
+  @@index([restaurantId, isActive])
+  @@index([bearerToken, isActive])
+  @@index([lastSeenAt])
+  @@map("device_sessions")
 }

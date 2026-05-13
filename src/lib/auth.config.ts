@@ -36,7 +36,11 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/icons/") ||
         nextUrl.pathname.startsWith("/menu/") ||
         nextUrl.pathname.startsWith("/nps/") ||
-        nextUrl.pathname.startsWith("/api/auth");
+        nextUrl.pathname.startsWith("/waiter-app/") ||
+        nextUrl.pathname.startsWith("/kitchen-app/") ||
+        nextUrl.pathname.startsWith("/api/auth") ||
+        nextUrl.pathname.startsWith("/api/devices/") ||
+        nextUrl.pathname.startsWith("/api/bff/");
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;
