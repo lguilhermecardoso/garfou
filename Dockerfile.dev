@@ -1,0 +1,24 @@
+FROM node:22-alpine
+
+RUN apk add --no-cache libc6-compat openssl bash
+
+WORKDIR /app
+
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1 \
+    CHOKIDAR_USEPOLLING=true \
+    WATCHPACK_POLLING=true \
+    HUSKY=0
+
+COPY package.json package-lock.json* ./
+COPY prisma ./prisma
+
+RUN npm install --no-audit --no-fund
+
+COPY docker/web-entrypoint.sh /usr/local/bin/web-entrypoint.sh
+RUN chmod +x /usr/local/bin/web-entrypoint.sh
+
+EXPOSE 3000
+
+ENTRYPOINT ["/usr/local/bin/web-entrypoint.sh"]
+CMD ["npm", "run", "dev", "--", "--hostname", "0.0.0.0", "--port", "3000"]

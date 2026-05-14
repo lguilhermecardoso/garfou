@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: garfou_dev
       POSTGRES_DB: garfou
     ports:
-      - "5433:5432"   # 5433 no host → evita conflito com Postgres local ou outros projetos
+      - "5433:5432" # 5433 no host → evita conflito com Postgres local ou outros projetos
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -18,5 +18,40 @@ services:
       retries: 10
       start_period: 10s
 
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: garfou_web
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: development
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      DATABASE_URL: "postgresql://garfou:garfou_dev@postgres:5432/garfou?schema=public"
+      DIRECT_URL: "postgresql://garfou:garfou_dev@postgres:5432/garfou?schema=public"
+      AUTH_URL: "http://localhost:3000"
+      AUTH_SECRET: "garfou-dev-auth-secret-change-in-production"
+      NEXT_PUBLIC_APP_URL: "http://localhost:3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+      # Hot reload em volumes (bind mount) funciona melhor com polling em Mac/Windows
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      # Define como "true" na 1ª subida para popular o banco com dados demo
+      RUN_SEED: "${RUN_SEED:-false}"
+    volumes:
+      # Código-fonte: bind mount para hot reload
+      - .:/app
+      # Volumes nomeados — isolam artefatos do host (evita conflitos de arch/SO)
+      - web_node_modules:/app/node_modules
+      - web_next_cache:/app/.next
+
 volumes:
   postgres_data:
+  web_node_modules:
+  web_next_cache:
