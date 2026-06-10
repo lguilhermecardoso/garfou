@@ -42,6 +42,7 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/api/devices/") ||
         nextUrl.pathname.startsWith("/api/bff/") ||
         nextUrl.pathname.startsWith("/api/webhooks/") ||
+        nextUrl.pathname.startsWith("/api/debug-db") ||
         /^\/api\/restaurants\/[^/]+\/payment-intent$/.test(nextUrl.pathname) ||
         /^\/api\/restaurants\/[^/]+\/checkout-session$/.test(nextUrl.pathname) ||
         /^\/api\/restaurants\/[^/]+\/menu$/.test(nextUrl.pathname) ||
