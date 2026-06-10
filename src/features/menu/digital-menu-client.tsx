@@ -851,11 +851,7 @@ export function DigitalMenuClient({
                     </div>
                     {isOpen && !productPaused && (
                       <div className="flex shrink-0 items-center gap-1.5">
-                        {requiresConfiguration ? (
-                          <Button size="sm" onClick={() => setSelectedProduct(product)}>
-                            Escolher
-                          </Button>
-                        ) : totalForProduct > 0 ? (
+                        {totalForProduct > 0 ? (
                           <>
                             <button
                               onClick={() => decrementCartItem(product.id)}
@@ -868,7 +864,7 @@ export function DigitalMenuClient({
                               {totalForProduct}
                             </span>
                             <button
-                              onClick={() => addSimpleProduct(product)}
+                              onClick={() => setSelectedProduct(product)}
                               className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
                               aria-label={`Adicionar mais ${product.name}`}
                             >
@@ -876,13 +872,9 @@ export function DigitalMenuClient({
                             </button>
                           </>
                         ) : (
-                          <button
-                            onClick={() => addSimpleProduct(product)}
-                            className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
-                            aria-label={`Adicionar ${product.name}`}
-                          >
-                            <Plus className="h-3 w-3" aria-hidden="true" />
-                          </button>
+                          <Button size="sm" onClick={() => setSelectedProduct(product)}>
+                            {requiresConfiguration ? "Escolher" : "Adicionar"}
+                          </Button>
                         )}
                       </div>
                     )}
@@ -949,11 +941,7 @@ export function DigitalMenuClient({
                           </div>
                           {isOpen && !productPaused && (
                             <div className="flex shrink-0 items-center gap-1.5">
-                              {requiresConfiguration ? (
-                                <Button size="sm" onClick={() => setSelectedProduct(product)}>
-                                  Escolher
-                                </Button>
-                              ) : totalForProduct > 0 ? (
+                              {totalForProduct > 0 ? (
                                 <>
                                   <button
                                     onClick={() => decrementCartItem(product.id)}
@@ -966,7 +954,7 @@ export function DigitalMenuClient({
                                     {totalForProduct}
                                   </span>
                                   <button
-                                    onClick={() => addSimpleProduct(product)}
+                                    onClick={() => setSelectedProduct(product)}
                                     className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
                                     aria-label={`Adicionar mais ${product.name}`}
                                   >
@@ -974,13 +962,9 @@ export function DigitalMenuClient({
                                   </button>
                                 </>
                               ) : (
-                                <button
-                                  onClick={() => addSimpleProduct(product)}
-                                  className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
-                                  aria-label={`Adicionar ${product.name}`}
-                                >
-                                  <Plus className="h-3 w-3" aria-hidden="true" />
-                                </button>
+                                <Button size="sm" onClick={() => setSelectedProduct(product)}>
+                                  {requiresConfiguration ? "Escolher" : "Adicionar"}
+                                </Button>
                               )}
                             </div>
                           )}
