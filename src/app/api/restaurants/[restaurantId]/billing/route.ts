@@ -45,11 +45,13 @@ export async function GET(_req: Request, { params }: Params) {
     try {
       const sub = await stripe.subscriptions.retrieve(restaurant.stripeSubscriptionId);
       // During trial, current_period_end is undefined — use trial_end instead
-      const periodEnd = sub.current_period_end ?? sub.trial_end ?? null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const subAny = sub as any;
+      const periodEnd = subAny.current_period_end ?? subAny.trial_end ?? null;
       currentPeriodEnd = periodEnd ? new Date(periodEnd * 1000).toISOString() : null;
-      cancelAtPeriodEnd = sub.cancel_at_period_end;
+      cancelAtPeriodEnd = subAny.cancel_at_period_end;
 
-      const priceId = sub.items.data[0]?.price.id;
+      const priceId = subAny.items.data[0]?.price.id;
       if (priceId) {
         for (const [key, plan] of Object.entries(STRIPE_PLANS)) {
           if (plan.priceId === priceId) {
@@ -60,7 +62,7 @@ export async function GET(_req: Request, { params }: Params) {
       }
 
       // Sync status in case it drifted
-      const stripeStatus = sub.status.toUpperCase() as
+      const stripeStatus = subAny.status.toUpperCase() as
         | "ACTIVE"
         | "TRIALING"
         | "PAST_DUE"
