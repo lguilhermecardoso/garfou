@@ -21,6 +21,15 @@ model User {
   image         String?
   passwordHash  String?
 
+  // Dados para contrato digital de assinatura
+  cpf           String?  // CPF (pessoa física) — XXX.XXX.XXX-XX
+  cnpj          String?  // CNPJ (empresa) — XX.XXX.XXX/XXXX-XX
+  companyName   String?  // Razão social ou nome fantasia
+  companyAddress String? // Endereço completo
+  companyCEP    String?  // CEP — XXXXX-XXX
+  companyCity   String?
+  companyState  String?  @db.Char(2)
+
   accounts             Account[]
   sessions             Session[]
   restaurants          UserRestaurant[]
@@ -103,6 +112,7 @@ model Restaurant {
   name    String
   slug    String @unique
   logo    String?
+  banner  String?
   phone   String?
   address String?
   city    String?
@@ -197,6 +207,7 @@ model Product {
   image           String?
   sortOrder       Int      @default(0)
   isActive        Boolean  @default(true)
+  isPaused        Boolean  @default(false)
   isInternalOnly  Boolean  @default(false)
   isFeatured      Boolean  @default(false)
   allowCustomization Boolean @default(false)
@@ -447,6 +458,7 @@ model Order {
 
   paymentMethod PaymentMethod?
   paymentStatus PaymentStatus  @default(PENDING)
+  stripePaymentIntentId String?
 
   notes           String?
   deliveryAddress Json?

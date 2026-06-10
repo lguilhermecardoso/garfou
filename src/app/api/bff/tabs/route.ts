@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateBearerToken, extractBearerToken } from "@/lib/device-auth";
 import { prisma } from "@/lib/db";
+import type { TabStatus } from "@prisma/client";
 
 /**
  * GET /api/bff/tabs - Lista comandas para dispositivos BFF
@@ -34,7 +35,7 @@ export async function GET(req: NextRequest) {
     const tabs = await prisma.tab.findMany({
       where: {
         restaurantId,
-        ...(statusParam && { status: statusParam }),
+        ...(statusParam && { status: statusParam as TabStatus }),
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     // Se mesa informada, valida se está disponível
     if (tableId) {
-      const table = await prisma.diningTable.findFirst({
+      const table = await prisma.table.findFirst({
         where: {
           id: tableId,
           restaurantId,
@@ -138,8 +139,8 @@ export async function POST(req: NextRequest) {
         restaurantId,
         tableId: tableId || null,
         guestCustomerName: guestCustomerName?.trim() || null,
+        openedBy: auth.createdBy,
         status: "OPEN",
-        subtotal: 0,
         discount: 0,
         total: 0,
         finalTotal: 0,
@@ -165,7 +166,7 @@ export async function POST(req: NextRequest) {
 
     // Atualiza status da mesa se informada
     if (tableId) {
-      await prisma.diningTable.update({
+      await prisma.table.update({
         where: { id: tableId },
         data: { status: "OCCUPIED" },
       });

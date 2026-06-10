@@ -59,7 +59,10 @@ export async function GET(req: NextRequest, { params }: Params) {
       }
 
       // Check if neighborhood is in zone.neighborhoods array
-      const zoneNeighborhoods = zone.neighborhoods as string[] | null | undefined;
+      const zoneNeighborhoods = (zone as Record<string, unknown>).neighborhoods as
+        | string[]
+        | null
+        | undefined;
       if (!zoneNeighborhoods || !Array.isArray(zoneNeighborhoods)) {
         return false;
       }

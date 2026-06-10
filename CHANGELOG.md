@@ -7,6 +7,41 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ## [Não Lançado]
 
+### Adicionado (2026-05-14 - Sessão: Features sem dependências externas)
+
+#### Histórico de Movimentações de Estoque
+
+- `GET /api/restaurants/[restaurantId]/inventory/movements/route.ts` — endpoint de listagem paginada com filtro opcional por item
+- `src/features/inventory/inventory-movements-table.tsx` — tabela client-side com paginação "carregar mais", badges coloridas por tipo (IN/OUT/ADJUSTMENT), prefixo de sinal
+- `src/app/(dashboard)/dashboard/[restaurantId]/inventory/movements/page.tsx` — página de histórico
+- `src/app/(dashboard)/dashboard/[restaurantId]/inventory/page.tsx` — adicionado botão "Histórico" com ícone History
+
+#### QR Code por Mesa
+
+- `src/features/tables/table-qr-modal.tsx` — modal com QR code SVG via `qrcode.react`, botões Imprimir e Baixar PNG
+- `src/features/tables/tables-settings.tsx` — adicionado botão QR Code por linha de mesa; aceita nova prop `restaurantSlug`
+- `src/app/(dashboard)/dashboard/[restaurantId]/settings/tables/page.tsx` — busca `restaurant.slug` e passa ao componente
+- `src/app/(public)/menu/[slug]/page.tsx` — aceita `?table=X` via `searchParams` e repassa para `DigitalMenuClient`
+- `src/features/menu/digital-menu-client.tsx` — aceita prop `tableNumber`, pré-preenche tipo DINE_IN, exibe badge "Mesa X" no checkout
+
+#### WhatsApp
+
+- `src/features/whatsapp/whatsapp-tools.tsx` — componente client com: link direto ao WhatsApp Web, wa.me builder (telefone → abre chat), templates com cópia para clipboard
+- `src/app/(dashboard)/dashboard/[restaurantId]/whatsapp/page.tsx` — substituída iframe inútil pelo novo `WhatsAppTools`
+- `src/features/orders/order-detail-modal.tsx` — botão "WhatsApp" quando cliente tem telefone cadastrado (abre wa.me com mensagem pré-configurada)
+
+#### Relatórios com Gráficos
+
+- `src/features/reports/revenue-chart.tsx` — AreaChart recharts de faturamento diário
+- `src/features/reports/orders-chart.tsx` — BarChart recharts de volume de pedidos diários
+- `src/app/(dashboard)/dashboard/[restaurantId]/reports/page.tsx` — seletor de período 7d/30d/3m, query diária com agregação em memória, rendering dos 2 gráficos
+
+#### Exportação CSV
+
+- `src/app/api/restaurants/[restaurantId]/reports/export/route.ts` — GET endpoint com type (orders|finance), from, to; retorna CSV com BOM UTF-8
+- `src/features/reports/export-csv-button.tsx` — botão client que abre URL de download na nova aba
+- Reports page — botões "Exportar pedidos" e "Exportar financeiro" integrados
+
 ### Adicionado (2026-01-12 - Sessão 3: Gestão de Equipe)
 
 #### Gestão de Equipe por Restaurante

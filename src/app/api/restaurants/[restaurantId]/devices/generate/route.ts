@@ -10,25 +10,38 @@ const generatePinSchema = z.object({
 });
 
 /**
- * Gera um PIN de 6 dígitos único para autenticação de dispositivo
+ * Gera um token de 6 dígitos único para autenticação de dispositivo.
  */
-function generatePin(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+async function generateUniqueToken(restaurantId: string, type: string): Promise<string> {
+  let attempts = 0;
+  const maxAttempts = 10;
+
+  while (attempts < maxAttempts) {
+    const token = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const existing = await prisma.deviceToken.findFirst({
+      where: { token, isActive: true },
+    });
+
+    if (!existing) {
+      return token;
+    }
+    attempts++;
+  }
+  throw new Error("Não foi possível gerar token único. Tente novamente.");
 }
 
 /**
  * POST /api/restaurants/[restaurantId]/devices/generate
  *
- * Gera um PIN temporário para autenticar tablet/TV no App Garçom ou Cozinha.
- * PIN expira em 24 horas e só pode ser usado uma vez.
- * Sessão permanece ativa por 24h após ativação.
+ * Gera um token de 6 dígitos para ativar tablet/TV no App Garçom ou Cozinha.
+ * Revoga token anterior do mesmo tipo (se existir) e gera um novo.
  *
  * Requer: Role MANAGER ou superior
  */
 export async function POST(req: NextRequest, { params }: Params) {
   const { restaurantId } = await params;
 
-  // Verifica permissão (MANAGER pode gerar PINs para dispositivos)
   const access = await requireRole(restaurantId, "MANAGER");
   if ("error" in access) {
     return NextResponse.json({ error: access.error }, { status: access.status });
@@ -47,73 +60,50 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { type } = parsed.data;
 
-    // Gera PIN único (tenta até 5x se houver colisão)
-    let pin: string = "";
-    let attempts = 0;
-    let isUnique = false;
+    // Revoga token existente do mesmo tipo (se houver)
+    await prisma.deviceToken.updateMany({
+      where: { restaurantId, type, isActive: true },
+      data: { isActive: false },
+    });
 
-    while (!isUnique && attempts < 5) {
-      pin = generatePin();
+    // Gera token único
+    const token = await generateUniqueToken(restaurantId, type);
 
-      // Verifica se PIN já existe e está ativo
-      const existing = await prisma.deviceSession.findFirst({
-        where: {
-          restaurantId,
-          pin,
-          isActive: true,
-          expiresAt: { gt: new Date() },
-        },
-      });
-
-      if (!existing) {
-        isUnique = true;
-      }
-      attempts++;
-    }
-
-    if (!isUnique) {
-      return NextResponse.json(
-        { error: "Não foi possível gerar PIN único. Tente novamente." },
-        { status: 500 }
-      );
-    }
-
-    // Cria sessão de dispositivo
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24); // Expira em 24 horas
-
-    const session = await prisma.deviceSession.create({
+    // Cria novo DeviceToken
+    const deviceToken = await prisma.deviceToken.create({
       data: {
         restaurantId,
-        pin,
+        token,
         type,
-        expiresAt,
         createdBy: access.userId,
         isActive: true,
+      },
+      include: {
+        creator: {
+          select: { name: true, email: true },
+        },
       },
     });
 
     return NextResponse.json({
       success: true,
       data: {
-        sessionId: session.id,
-        pin,
+        tokenId: deviceToken.id,
+        pin: token,
         type,
-        expiresAt: session.expiresAt.toISOString(),
-        expiresInHours: 24,
+        createdBy: deviceToken.creator,
       },
     });
   } catch (error) {
-    console.error("Error generating device PIN:", error);
-    return NextResponse.json({ error: "Erro ao gerar PIN do dispositivo" }, { status: 500 });
+    console.error("Error generating device token:", error);
+    return NextResponse.json({ error: "Erro ao gerar token do dispositivo" }, { status: 500 });
   }
 }
 
 /**
  * GET /api/restaurants/[restaurantId]/devices/generate
  *
- * Lista todas as sessões ativas de dispositivos do restaurante.
- * Útil para ver quais tablets/TVs estão conectados.
+ * Lista tokens ativos de dispositivos do restaurante.
  *
  * Requer: Role MANAGER ou superior
  */
@@ -126,26 +116,31 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
 
   try {
-    const sessions = await prisma.deviceSession.findMany({
-      where: {
-        restaurantId,
-        isActive: true,
-        expiresAt: { gt: new Date() },
-      },
-      orderBy: { createdAt: "desc" },
+    const tokens = await prisma.deviceToken.findMany({
+      where: { restaurantId, isActive: true },
       include: {
-        creator: {
-          select: { name: true, email: true },
+        creator: { select: { name: true, email: true } },
+        sessions: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            isActive: true,
+            deviceInfo: true,
+            activatedAt: true,
+            lastSeenAt: true,
+          },
+          orderBy: { activatedAt: "desc" },
         },
       },
+      orderBy: { type: "asc" },
     });
 
     return NextResponse.json({
       success: true,
-      data: sessions,
+      data: tokens,
     });
   } catch (error) {
-    console.error("Error listing device sessions:", error);
-    return NextResponse.json({ error: "Erro ao listar sessões de dispositivos" }, { status: 500 });
+    console.error("Error listing device tokens:", error);
+    return NextResponse.json({ error: "Erro ao listar tokens de dispositivos" }, { status: 500 });
   }
 }

@@ -23,7 +23,7 @@ export default function ComponentsPreviewPage() {
     <main className="min-h-screen space-y-12 bg-neutral-50 p-8">
       <header>
         <h1 className="text-3xl font-bold text-neutral-900">Component Library</h1>
-        <p className="mt-1 text-neutral-500">Garfou design system preview — dev only</p>
+        <p className="mt-1 text-neutral-500">chamou.delivery design system preview — dev only</p>
       </header>
 
       {/* Buttons */}
@@ -87,11 +87,11 @@ export default function ComponentsPreviewPage() {
       <section>
         <h2 className="mb-4 text-xl font-semibold text-neutral-800">Masked Inputs (BR)</h2>
         <div className="max-w-md space-y-4">
-          <PhoneInput label="Telefone" placeholder="(00) 00000-0000" />
-          <CPFInput label="CPF" placeholder="000.000.000-00" />
-          <CNPJInput label="CNPJ" placeholder="00.000.000/0000-00" />
-          <CEPInput label="CEP" placeholder="00000-000" />
-          <EmailInput label="E-mail" placeholder="email@exemplo.com" />
+          <PhoneInput label="Telefone" placeholder="(00) 00000-0000" onChange={() => {}} />
+          <CPFInput label="CPF" placeholder="000.000.000-00" onChange={() => {}} />
+          <CNPJInput label="CNPJ" placeholder="00.000.000/0000-00" onChange={() => {}} />
+          <CEPInput label="CEP" placeholder="00000-000" onChange={() => {}} />
+          <EmailInput label="E-mail" placeholder="email@exemplo.com" onChange={() => {}} />
         </div>
       </section>
 

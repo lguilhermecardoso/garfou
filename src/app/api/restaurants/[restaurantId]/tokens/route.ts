@@ -105,8 +105,8 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
 
     // Require MANAGER or OWNER role
     const access = await requireRole(restaurantId, "MANAGER");
-    if (!access.authorized) {
-      return NextResponse.json({ error: access.message }, { status: access.status });
+    if ("error" in access) {
+      return NextResponse.json({ error: access.error }, { status: access.status });
     }
 
     const body = await req.json();
@@ -114,7 +114,7 @@ export async function POST(req: NextRequest, { params }: { params: Params }) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Dados inválidos", details: parsed.error.errors },
+        { error: "Dados inválidos", details: parsed.error.issues },
         { status: 400 }
       );
     }

@@ -326,7 +326,8 @@ export function OrderTrackingFAB({ restaurantId }: Props) {
                                       Endereço de entrega
                                     </p>
                                     <p className="mt-0.5 text-xs text-neutral-600">
-                                      {order.deliveryAddress.street}, {order.deliveryAddress.number}
+                                      {String(order.deliveryAddress.street)},{" "}
+                                      {String(order.deliveryAddress.number)}
                                     </p>
                                   </div>
                                 )}

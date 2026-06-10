@@ -4,7 +4,36 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { OrderDetailModal } from "./order-detail-modal";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { CheckCircle, XCircle, RefreshCw, Eye, CheckCheck, Truck } from "lucide-react";
+import {
+  CheckCircle,
+  XCircle,
+  RefreshCw,
+  Eye,
+  CheckCheck,
+  Truck,
+  MessageCircle,
+  ClipboardPlus,
+} from "lucide-react";
+import { ManualOrderModal } from "./manual-order-modal";
+
+const WA_MESSAGES: Partial<Record<string, string>> = {
+  CONFIRMADO: "Olá {{name}}! Seu pedido #{{num}} foi confirmado ✅ Em breve estará pronto!",
+  EM_PREPARO: "Olá {{name}}! Seu pedido #{{num}} está sendo preparado 👨‍🍳",
+  PRONTO: "Olá {{name}}! Seu pedido #{{num}} está pronto! 🎉",
+  SAIU_PARA_ENTREGA: "Olá {{name}}! Seu pedido #{{num}} saiu para entrega 🛵 Já já chega!",
+  FINALIZADO: "Olá {{name}}! Seu pedido #{{num}} foi entregue. Bom apetite! 😄",
+  CANCELADO:
+    "Olá {{name}}! Seu pedido #{{num}} foi cancelado. Entre em contato para mais informações.",
+};
+
+function buildWaHref(phone: string, name: string, num: number, status: string) {
+  const template =
+    WA_MESSAGES[status] ??
+    "Olá {{name}}! Atualizamos o status do seu pedido #{{num}}. Qualquer dúvida estamos aqui.";
+  const text = template.replace("{{name}}", name).replace("{{num}}", String(num));
+  const clean = phone.replace(/\D/g, "");
+  return `https://wa.me/55${clean}?text=${encodeURIComponent(text)}`;
+}
 
 interface Order {
   id: string;
@@ -15,6 +44,7 @@ interface Order {
   total: number;
   createdAt: string;
   items: unknown[];
+  customer: { id: string; name: string; phone: string | null } | null;
 }
 
 interface Props {
@@ -59,6 +89,7 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
   const knownIds = useRef<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async () => {
@@ -104,6 +135,16 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
 
   return (
     <>
+      {/* Manual retroactive order modal */}
+      <ManualOrderModal
+        restaurantId={restaurantId}
+        open={manualModalOpen}
+        onClose={() => setManualModalOpen(false)}
+        onSuccess={() => {
+          setManualModalOpen(false);
+          fetchOrders();
+        }}
+      />
       {/* Order detail modal */}
       <OrderDetailModal
         orderId={selectedOrderId}
@@ -115,23 +156,32 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
       />
 
       <div className="space-y-4">
-        {/* Status filter pills */}
-        <div className="flex flex-wrap gap-2">
-          <button
-            onClick={() => setStatusFilter("")}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === "" ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
-          >
-            Todos
-          </button>
-          {ALL_STATUSES.map((s) => (
+        {/* Top bar: filter pills + manual order button */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap gap-2">
             <button
-              key={s}
-              onClick={() => setStatusFilter(s)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === s ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+              onClick={() => setStatusFilter("")}
+              className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === "" ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
             >
-              {STATUS_LABELS[s]}
+              Todos
             </button>
-          ))}
+            {ALL_STATUSES.map((s) => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === s ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
+              >
+                {STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setManualModalOpen(true)}
+            className="hover:border-primary-400 hover:bg-primary-50 hover:text-primary-700 flex shrink-0 items-center gap-2 rounded-xl border border-dashed border-neutral-300 bg-white px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors"
+          >
+            <ClipboardPlus className="h-4 w-4" />
+            Lançar retroativo
+          </button>
         </div>
 
         {/* Table */}
@@ -149,6 +199,7 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">#</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Status</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Tipo</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Cliente</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Mesa</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Itens</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Total</th>
@@ -159,7 +210,7 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                 <tbody>
                   {orders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="px-4 py-8 text-center text-neutral-400">
+                      <td colSpan={9} className="px-4 py-8 text-center text-neutral-400">
                         Nenhum pedido encontrado
                       </td>
                     </tr>
@@ -183,6 +234,9 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                           </td>
                           <td className="px-4 py-3 text-neutral-600">
                             {order.type.replace(/_/g, " ")}
+                          </td>
+                          <td className="px-4 py-3 text-neutral-600">
+                            {order.customer?.name ?? <span className="text-neutral-400">—</span>}
                           </td>
                           <td className="px-4 py-3 text-neutral-600">{order.tableNumber ?? "—"}</td>
                           <td className="px-4 py-3 text-neutral-600">{order.items.length}</td>
@@ -245,6 +299,23 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                                   <CheckCheck className="h-4 w-4" />
                                 </button>
                               ) : null}
+                              {/* WhatsApp quick-send */}
+                              {order.customer?.phone && (
+                                <a
+                                  href={buildWaHref(
+                                    order.customer.phone,
+                                    order.customer.name,
+                                    order.orderNumber,
+                                    order.status
+                                  )}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  title={`Enviar WhatsApp para ${order.customer.name}`}
+                                  className="rounded-lg bg-green-100 p-1.5 text-green-700 transition-colors hover:bg-green-200"
+                                >
+                                  <MessageCircle className="h-4 w-4" />
+                                </a>
+                              )}
                             </div>
                           </td>
                         </tr>

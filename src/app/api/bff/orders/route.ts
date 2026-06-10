@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateBearerToken, extractBearerToken } from "@/lib/device-auth";
 import { prisma } from "@/lib/db";
+import type { OrderStatus, Prisma } from "@prisma/client";
 
 /**
  * GET /api/bff/orders
@@ -37,15 +38,12 @@ export async function GET(req: NextRequest) {
     const pageSize = parseInt(searchParams.get("pageSize") || "50");
 
     // Build where clause
-    const where: {
-      restaurantId: string;
-      status?: { in: string[] };
-    } = {
+    const where: Prisma.OrderWhereInput = {
       restaurantId: deviceAuth.restaurantId,
     };
 
     if (statusParam) {
-      const statuses = statusParam.split(",").map((s) => s.trim());
+      const statuses = statusParam.split(",").map((s) => s.trim()) as OrderStatus[];
       where.status = { in: statuses };
     }
 
@@ -188,10 +186,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Gera o próximo número do pedido
+    const lastOrder = await prisma.order.findFirst({
+      where: { restaurantId: deviceAuth.restaurantId },
+      orderBy: { orderNumber: "desc" },
+      select: { orderNumber: true },
+    });
+    const orderNumber = (lastOrder?.orderNumber ?? 0) + 1;
+
     // Criar pedido
     const order = await prisma.order.create({
       data: {
         restaurantId: deviceAuth.restaurantId,
+        orderNumber,
         type,
         status: "NOVO_PEDIDO",
         tabId: tabId || null,
@@ -215,9 +222,9 @@ export async function POST(req: NextRequest) {
               unitPrice: 0, // Will be calculated
               notes: item.notes || null,
               selectedOptions:
-                item.selectedOptions?.length > 0
+                (item.selectedOptions?.length ?? 0) > 0
                   ? {
-                      create: item.selectedOptions.map(
+                      create: item.selectedOptions!.map(
                         (opt: { optionId: string; quantity: number; isRemoval?: boolean }) => ({
                           optionId: opt.optionId,
                           quantity: opt.quantity,
@@ -229,9 +236,9 @@ export async function POST(req: NextRequest) {
                     }
                   : undefined,
               splits:
-                item.splits?.length > 0
+                (item.splits?.length ?? 0) > 0
                   ? {
-                      create: item.splits.map(
+                      create: item.splits!.map(
                         (split: { splitIndex: number; flavorProductId: string }) => ({
                           splitIndex: split.splitIndex,
                           productId: split.flavorProductId,
@@ -260,23 +267,23 @@ export async function POST(req: NextRequest) {
     let subtotal = 0;
     for (const item of order.items) {
       const product = item.product;
-      let itemTotal = product.price * item.quantity;
+      let itemTotal = Number(product.price) * item.quantity;
 
       // Calcular preço das opções
       if (item.selectedOptions.length > 0) {
         for (const opt of item.selectedOptions) {
-          const modifier = await prisma.modifier.findUnique({
+          const modifier = await prisma.modifierOption.findUnique({
             where: { id: opt.optionId },
           });
           if (modifier) {
-            await prisma.orderItemOption.update({
+            await prisma.orderItemSelectedOption.update({
               where: { id: opt.id },
               data: {
                 unitPrice: modifier.price,
                 optionName: modifier.name,
               },
             });
-            itemTotal += modifier.price * opt.quantity * item.quantity;
+            itemTotal += Number(modifier.price) * opt.quantity * item.quantity;
           }
         }
       }
@@ -288,7 +295,7 @@ export async function POST(req: NextRequest) {
             const flavor = await prisma.product.findUnique({
               where: { id: split.productId },
             });
-            return flavor ? flavor.price : 0;
+            return flavor ? Number(flavor.price) : 0;
           })
         );
         const maxPrice = Math.max(...flavorPrices);
@@ -351,13 +358,13 @@ export async function POST(req: NextRequest) {
       });
 
       if (tab) {
-        const tabSubtotal = tab.orders.reduce((sum, order) => sum + order.subtotal, 0);
+        const tabTotal = tab.orders.reduce((sum, o) => sum + Number(o.total), 0);
+        const tabDiscount = Number(tab.discount);
         await prisma.tab.update({
           where: { id: tabId },
           data: {
-            subtotal: tabSubtotal,
-            total: tabSubtotal - tab.discount,
-            finalTotal: tabSubtotal - tab.discount,
+            total: tabTotal,
+            finalTotal: tabTotal - tabDiscount,
           },
         });
       }

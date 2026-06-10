@@ -31,18 +31,18 @@ export async function GET(req: NextRequest) {
     const isActiveParam = url.searchParams.get("isActive");
 
     // Busca mesas
-    const tables = await prisma.diningTable.findMany({
+    const tables = await prisma.table.findMany({
       where: {
         restaurantId,
+        deletedAt: null,
         ...(isActiveParam !== null && { isActive: isActiveParam === "true" }),
       },
-      orderBy: [{ section: "asc" }, { identifier: "asc" }],
+      orderBy: [{ identifier: "asc" }],
       select: {
         id: true,
         identifier: true,
         capacity: true,
         status: true,
-        section: true,
         isActive: true,
       },
     });

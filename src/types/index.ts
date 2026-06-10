@@ -1,4 +1,4 @@
-// Global TypeScript types for GARFOU
+// Global TypeScript types for chamou.delivery
 
 import type {
   UserRole,

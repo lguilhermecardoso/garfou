@@ -18,6 +18,7 @@ import {
   Tag,
   Truck,
   MessageCircle,
+  Flame,
   Table2,
 } from "lucide-react";
 import type { UserRole } from "@/lib/roles";
@@ -148,8 +149,8 @@ export function DashboardSidebar({ restaurantId, userRole }: Props) {
     >
       {/* Logo */}
       <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-4">
-        <UtensilsCrossed className="text-primary-500 h-6 w-6" aria-hidden="true" />
-        <span className="text-lg font-bold text-neutral-900">GARFOU</span>
+        <Flame className="text-primary-500 h-6 w-6" aria-hidden="true" />
+        <span className="text-lg font-bold text-neutral-900">chamou.delivery</span>
       </div>
 
       {/* Nav */}

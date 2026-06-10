@@ -31,32 +31,33 @@ export async function GET(req: NextRequest) {
     const includeInactive = url.searchParams.get("includeInactive") === "true";
 
     // Busca categorias com produtos
-    const categories = await prisma.menuCategory.findMany({
+    const categories = await prisma.category.findMany({
       where: {
         restaurantId,
         isActive: includeInactive ? undefined : true,
+        deletedAt: null,
       },
-      orderBy: { order: "asc" },
+      orderBy: { sortOrder: "asc" },
       include: {
         products: {
           where: {
             isActive: includeInactive ? undefined : true,
+            deletedAt: null,
           },
-          orderBy: { order: "asc" },
+          orderBy: { sortOrder: "asc" },
           include: {
             modifierGroups: {
-              where: { isActive: true },
-              orderBy: { order: "asc" },
+              orderBy: { sortOrder: "asc" },
               include: {
                 options: {
-                  where: { isActive: true },
-                  orderBy: { order: "asc" },
+                  where: { isAvailable: true },
+                  orderBy: { sortOrder: "asc" },
                 },
               },
             },
-            splitFlavors: {
-              where: { isActive: true },
-              orderBy: { order: "asc" },
+            splitSources: {
+              where: { isAvailable: true },
+              orderBy: { sortOrder: "asc" },
             },
           },
         },
@@ -70,8 +71,8 @@ export async function GET(req: NextRequest) {
         type: auth.deviceType,
         restaurant: {
           id: auth.restaurantId,
-          name: auth.restaurantName,
-          slug: auth.restaurantSlug,
+          name: auth.restaurant.name,
+          slug: auth.restaurant.slug,
         },
       },
     });

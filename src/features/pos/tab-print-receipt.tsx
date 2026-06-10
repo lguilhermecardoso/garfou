@@ -212,7 +212,7 @@ export function buildTabReceiptLines(tab: PrintTab, restaurant: PrintRestaurant)
     add(leftRight(`Pedido #${order.orderNumber}`, formatCurrency(order.total)));
   }
 
-  add(line("─"), center("Obrigado pela preferencia!"), center("www.garfou.com.br"), line("═"));
+  add(line("─"), center("Obrigado pela preferencia!"), center("www.chamou.delivery"), line("═"));
 
   return rows;
 }

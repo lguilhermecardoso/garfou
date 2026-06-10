@@ -95,6 +95,15 @@ export const orderService = {
       throw new Error("Um ou mais produtos não encontrados ou inativos");
     }
 
+    // 1b. Check for paused products (temporarily unavailable)
+    const pausedProducts = products.filter((p) => p.isPaused);
+    if (pausedProducts.length > 0) {
+      const names = pausedProducts.map((p) => p.name).join(", ");
+      throw new Error(
+        `${pausedProducts.length === 1 ? "O produto" : "Os produtos"} "${names}" ${pausedProducts.length === 1 ? "está" : "estão"} temporariamente indisponível${pausedProducts.length === 1 ? "" : "s"}. Por favor, remova-${pausedProducts.length === 1 ? "o" : "os"} do carrinho.`
+      );
+    }
+
     // 2. Build product price map
     const productMap = new Map(products.map((p) => [p.id, p]));
     const addonMap = new Map(products.flatMap((p) => p.addons ?? []).map((a) => [a.id, a]));

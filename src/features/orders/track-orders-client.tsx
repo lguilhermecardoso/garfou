@@ -64,7 +64,7 @@ export function TrackOrdersClient({ restaurantSlug }: Props) {
     },
   });
 
-  const { data, isLoading } = useQuery<CustomerData>({
+  const { data, isLoading, error } = useQuery<CustomerData>({
     queryKey: ["track-orders", restaurant?.id, searchedPhone],
     queryFn: async () => {
       if (!restaurant?.id || !searchedPhone) return { customer: null, orders: [] };
@@ -267,8 +267,9 @@ export function TrackOrdersClient({ restaurantSlug }: Props) {
                                 Endereço de entrega
                               </p>
                               <p className="mt-1 text-sm text-neutral-600">
-                                {order.deliveryAddress.street}, {order.deliveryAddress.number} -{" "}
-                                {order.deliveryAddress.district}
+                                {String(order.deliveryAddress.street)},{" "}
+                                {String(order.deliveryAddress.number)} -{" "}
+                                {String(order.deliveryAddress.district)}
                               </p>
                             </div>
                           )}

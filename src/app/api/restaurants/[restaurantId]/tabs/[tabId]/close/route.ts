@@ -46,8 +46,8 @@ export async function PATCH(
           registerId: currentRegister.id,
           type: CashTransactionType.SALE,
           amount: Number(closedTab.finalTotal),
-          paymentMethod: closedTab.paymentMethod,
-          description: `Comanda #${closedTab.id.slice(-8)} - Mesa ${closedTab.table?.identifier || "N/A"}`,
+          paymentMethod: closedTab.paymentMethod!,
+          description: `Comanda #${closedTab.id.slice(-8)} - Mesa ${closedTab.tableId || "N/A"}`,
           userId: session.user.id,
         });
       }

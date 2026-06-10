@@ -5,11 +5,13 @@ import { useFormStatus } from "react-dom";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UtensilsCrossed } from "lucide-react";
+import { Flame } from "lucide-react";
 import { signInWithCredentialsAction, signInWithGoogleAction } from "@/features/auth/actions";
 
 interface Props {
   callbackUrl: string;
+  prefillEmail?: string;
+  justRegistered?: boolean;
 }
 
 function SubmitButton({ children, ...props }: React.ComponentProps<typeof Button>) {
@@ -22,19 +24,28 @@ function SubmitButton({ children, ...props }: React.ComponentProps<typeof Button
   );
 }
 
-export function SignInForm({ callbackUrl }: Props) {
-  const [state, formAction] = useActionState(signInWithCredentialsAction, { error: "" });
+export function SignInForm({ callbackUrl, prefillEmail, justRegistered }: Props) {
+  const [state, formAction] = useActionState(signInWithCredentialsAction, {
+    error: "",
+    email: prefillEmail,
+  });
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-neutral-50 px-4">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <div className="bg-primary-500 mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl">
-            <UtensilsCrossed className="h-6 w-6 text-white" aria-hidden="true" />
+            <Flame className="h-6 w-6 text-white" aria-hidden="true" />
           </div>
-          <h1 className="text-2xl font-bold text-neutral-900">Entrar no GARFOU</h1>
+          <h1 className="text-2xl font-bold text-neutral-900">Entrar no chamou.delivery</h1>
           <p className="mt-1 text-sm text-neutral-500">Faça login na sua conta</p>
         </div>
+
+        {justRegistered && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            ✓ Conta criada com sucesso! Faça login para continuar.
+          </div>
+        )}
 
         <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
           <form action={formAction} className="space-y-4">

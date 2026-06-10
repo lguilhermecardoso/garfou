@@ -148,7 +148,7 @@ export function buildReceiptLines(order: PrintOrder): string[] {
 
   add(
     line("═"),
-    center("GARFOU"),
+    center("chamou.delivery"),
     center("Sistema de Gestao de Pedidos"),
     line("─"),
     center(`PEDIDO #${order.orderNumber}`),
@@ -252,7 +252,7 @@ export function buildReceiptLines(order: PrintOrder): string[] {
     add(center("OBSERVACOES"), ...wrap(order.notes), line("─"));
   }
 
-  add(center("Obrigado pela preferencia!"), center("www.garfou.com.br"), line("═"));
+  add(center("Obrigado pela preferencia!"), center("www.chamou.delivery"), line("═"));
 
   return rows;
 }

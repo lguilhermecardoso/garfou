@@ -10,7 +10,7 @@ Heed deprecation notices.
 
 ---
 
-# GARFOU — Agent Context (updated 2026-05-12)
+# GARFOU — Agent Context (updated 2026-06-10)
 
 > **Read this file first.** It is the single source of truth for any AI agent working on this codebase.
 > Every section links to the deeper doc for that topic. Never invent conventions — always check here first.
@@ -19,7 +19,7 @@ Heed deprecation notices.
 
 ## 1. Project Summary
 
-**Garfou** is a multi-tenant SaaS for restaurant management (orders, kitchen, waiter, menu,
+**chamou.delivery** (formerly Garfou) is a multi-tenant SaaS for restaurant management (orders, kitchen, waiter, menu,
 inventory, finance, NPS). It runs on Vercel FREE tier — no persistent websockets, polling only.
 
 ---

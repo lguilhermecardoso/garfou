@@ -40,6 +40,7 @@ import {
   AlertCircle,
   CheckCheck,
   Truck,
+  MessageCircle,
 } from "lucide-react";
 import { PrintConfirmationModal } from "@/components/shared/print-confirmation-modal";
 import { usePrintConfirmation } from "@/hooks/use-print-confirmation";
@@ -261,7 +262,39 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
         {/* Footer actions */}
         {!loading && order && (
           <div className="rounded-b-2xl border-t border-neutral-200 bg-white px-5 py-4">
-            <div className="flex justify-end gap-2">
+            <div className="flex flex-wrap justify-end gap-2">
+              {/* WhatsApp quick-send — only when customer phone is available */}
+              {order.customer?.phone &&
+                (() => {
+                  const name = order.customer!.name;
+                  const num = order.orderNumber;
+                  const waMessages: Partial<Record<string, string>> = {
+                    CONFIRMADO: `Olá ${name}! Seu pedido #${num} foi confirmado ✅ Em breve estará pronto!`,
+                    EM_PREPARO: `Olá ${name}! Seu pedido #${num} está sendo preparado 👨‍🍳`,
+                    PRONTO: `Olá ${name}! Seu pedido #${num} está pronto! 🎉`,
+                    SAIU_PARA_ENTREGA: `Olá ${name}! Seu pedido #${num} saiu para entrega 🛵 Já já chega!`,
+                    FINALIZADO: `Olá ${name}! Seu pedido #${num} foi entregue. Bom apetite! 😄`,
+                    CANCELADO: `Olá ${name}! Infelizmente seu pedido #${num} foi cancelado. Entre em contato para mais informações.`,
+                  };
+                  const text =
+                    waMessages[order.status] ??
+                    `Olá ${name}! Atualizamos o status do seu pedido #${num}. Qualquer dúvida estamos aqui.`;
+                  const phone = order.customer!.phone!.replace(/\D/g, "");
+                  const href = `https://wa.me/55${phone}?text=${encodeURIComponent(text)}`;
+                  return (
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 rounded-xl border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 transition-colors hover:bg-green-100"
+                      aria-label="Enviar mensagem no WhatsApp"
+                    >
+                      <MessageCircle className="h-4 w-4" aria-hidden="true" />
+                      WhatsApp
+                    </a>
+                  );
+                })()}
+
               {/* Print — always available */}
               <button
                 onClick={() => printConfirmation.startPrint(() => printOrder(order))}

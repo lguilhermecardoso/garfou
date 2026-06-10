@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { BillingSection } from "@/features/settings/billing-section";
 import type { Metadata } from "next";
 
-export const metadata: Metadata = { title: "Assinatura — Garfou" };
+export const metadata: Metadata = { title: "Assinatura — chamou.delivery" };
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
@@ -26,7 +26,7 @@ export default async function BillingPage({ params, searchParams }: Props) {
 
       {success === "true" && (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-          ✓ Assinatura iniciada com sucesso! Bem-vindo ao Garfou.
+          ✓ Assinatura iniciada com sucesso! Bem-vindo ao chamou.delivery.
         </div>
       )}
       {canceled === "true" && (

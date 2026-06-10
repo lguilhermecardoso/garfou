@@ -94,18 +94,18 @@ async function upsertUser({ name, email, password }) {
 }
 
 async function main() {
-  const DEMO_SLUG = "garfou-demo-max";
-  const DEMO_NAME = "Garfou Prime Bistrô";
+  const DEMO_SLUG = "chamou-demo-max";
+  const DEMO_NAME = "Chamou Prime Bistrô";
 
   console.log("[seed] starting...");
 
   // ── Users ────────────────────────────────────────────────────────
   const users = {
-    owner: await upsertUser({ name: "Alice Donati", email: "owner@garfou.demo", password: "Owner123!" }),
-    manager: await upsertUser({ name: "Bruno Silveira", email: "manager@garfou.demo", password: "Manager123!" }),
-    waiter: await upsertUser({ name: "Carla Souza", email: "waiter@garfou.demo", password: "Waiter123!" }),
-    kitchen: await upsertUser({ name: "Diego Lima", email: "kitchen@garfou.demo", password: "Kitchen123!" }),
-    cashier: await upsertUser({ name: "Eva Rocha", email: "cashier@garfou.demo", password: "Cashier123!" }),
+    owner: await upsertUser({ name: "Alice Donati", email: "owner@chamou.demo", password: "Owner123!" }),
+    manager: await upsertUser({ name: "Bruno Silveira", email: "manager@chamou.demo", password: "Manager123!" }),
+    waiter: await upsertUser({ name: "Carla Souza", email: "waiter@chamou.demo", password: "Waiter123!" }),
+    kitchen: await upsertUser({ name: "Diego Lima", email: "kitchen@chamou.demo", password: "Kitchen123!" }),
+    cashier: await upsertUser({ name: "Eva Rocha", email: "cashier@chamou.demo", password: "Cashier123!" }),
   };
 
   // ── Restaurant (UPSERT to keep same ID) ──────────────────────────
@@ -120,8 +120,8 @@ async function main() {
       state: "SP",
       isOpen: true,
       subscriptionStatus: SubscriptionStatus.ACTIVE,
-      stripeCustomerId: "cus_demo_garfou_prime",
-      stripeSubscriptionId: "sub_demo_garfou_enterprise",
+      stripeCustomerId: "cus_demo_chamou_prime",
+      stripeSubscriptionId: "sub_demo_chamou_enterprise",
       trialEndsAt: new Date("2027-01-01T00:00:00.000Z"),
       settings: {
         plan: "ENTERPRISE",
@@ -145,8 +145,8 @@ async function main() {
       state: "SP",
       isOpen: true,
       subscriptionStatus: SubscriptionStatus.ACTIVE,
-      stripeCustomerId: "cus_demo_garfou_prime",
-      stripeSubscriptionId: "sub_demo_garfou_enterprise",
+      stripeCustomerId: "cus_demo_chamou_prime",
+      stripeSubscriptionId: "sub_demo_chamou_enterprise",
       trialEndsAt: new Date("2027-01-01T00:00:00.000Z"),
       settings: {
         plan: "ENTERPRISE",
@@ -701,11 +701,11 @@ async function main() {
   console.log("[seed] done ✓");
   console.log(`[seed] restaurant: ${DEMO_NAME} (${DEMO_SLUG}) — id: ${rId}`);
   console.log("[seed] users:");
-  console.log("  owner@garfou.demo   / Owner123!");
-  console.log("  manager@garfou.demo / Manager123!");
-  console.log("  waiter@garfou.demo  / Waiter123!");
-  console.log("  kitchen@garfou.demo / Kitchen123!");
-  console.log("  cashier@garfou.demo / Cashier123!");
+  console.log("  owner@chamou.demo   / Owner123!");
+  console.log("  manager@chamou.demo / Manager123!");
+  console.log("  waiter@chamou.demo  / Waiter123!");
+  console.log("  kitchen@chamou.demo / Kitchen123!");
+  console.log("  cashier@chamou.demo / Cashier123!");
   console.log("[seed] pedidos: 15 (todos os status representados)");
   console.log("[seed] caixa: 1 aberto com R$200 inicial + 9 transações");
   console.log("[seed] estoque: 2 itens abaixo do minimo (alertas)");

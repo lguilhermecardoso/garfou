@@ -109,7 +109,7 @@ export default function NewRestaurantPage() {
                 <Input
                   value={form.name}
                   onChange={(e) => update("name", e.target.value)}
-                  placeholder="Ex: Garfou Bistrô - Shopping Iguatemi"
+                  placeholder="Ex: Bistrô Centro - Shopping Iguatemi"
                   required
                   autoFocus
                 />

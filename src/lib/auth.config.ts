@@ -40,7 +40,13 @@ export const authConfig: NextAuthConfig = {
         nextUrl.pathname.startsWith("/kitchen-app/") ||
         nextUrl.pathname.startsWith("/api/auth") ||
         nextUrl.pathname.startsWith("/api/devices/") ||
-        nextUrl.pathname.startsWith("/api/bff/");
+        nextUrl.pathname.startsWith("/api/bff/") ||
+        nextUrl.pathname.startsWith("/api/webhooks/") ||
+        /^\/api\/restaurants\/[^/]+\/payment-intent$/.test(nextUrl.pathname) ||
+        /^\/api\/restaurants\/[^/]+\/checkout-session$/.test(nextUrl.pathname) ||
+        /^\/api\/restaurants\/[^/]+\/menu$/.test(nextUrl.pathname) ||
+        /^\/api\/restaurants\/[^/]+\/orders(\/[^/]+)?$/.test(nextUrl.pathname) ||
+        /^\/api\/restaurants\/[^/]+\/delivery-zones/.test(nextUrl.pathname);
 
       if (isPublic) return true;
       if (!isLoggedIn) return false;

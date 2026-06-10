@@ -55,7 +55,7 @@ interface Props {
 }
 
 const POLL_MS = 8_000;
-const READ_ORDERS_KEY = "garfou:read-orders";
+const READ_ORDERS_KEY = "chamou:read-orders";
 
 // ─── Helper: localStorage for read state ─────────────────────────────────────
 

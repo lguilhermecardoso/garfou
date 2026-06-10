@@ -4,7 +4,9 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { UtensilsCrossed, ArrowRight, MapPin, Phone } from "lucide-react";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { PhoneInput } from "@/components/ui/masked-input";
+import { Flame, ArrowRight, MapPin, Phone } from "lucide-react";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -18,6 +20,7 @@ export default function OnboardingPage() {
     address: "",
     city: "",
     state: "",
+    logo: "" as string | null,
   });
 
   // Verifica se usuário já tem restaurantes e redireciona
@@ -73,7 +76,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/restaurants", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, logo: form.logo || undefined }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -111,10 +114,10 @@ export default function OnboardingPage() {
       <header className="border-b border-neutral-100 bg-white px-4 py-4">
         <div className="mx-auto flex max-w-lg items-center gap-3">
           <div className="bg-primary-500 flex h-10 w-10 items-center justify-center rounded-2xl">
-            <UtensilsCrossed className="h-5 w-5 text-white" aria-hidden="true" />
+            <Flame className="h-5 w-5 text-white" aria-hidden="true" />
           </div>
           <div>
-            <span className="text-lg font-bold text-neutral-900">GARFOU</span>
+            <span className="text-lg font-bold text-neutral-900">chamou.delivery</span>
             <p className="text-xs text-neutral-500">Configure seu restaurante</p>
           </div>
         </div>
@@ -178,13 +181,11 @@ export default function OnboardingPage() {
                 <div className="flex items-start gap-3">
                   <Phone className="mt-7 h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
                   <div className="flex-1">
-                    <Input
+                    <PhoneInput
                       label="Telefone / WhatsApp"
                       id="phone"
-                      type="tel"
                       value={form.phone}
                       onChange={(e) => update("phone", e.target.value)}
-                      placeholder="(11) 99999-9999"
                     />
                   </div>
                 </div>
@@ -218,6 +219,17 @@ export default function OnboardingPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              <div className="rounded-2xl bg-white p-6 shadow-sm">
+                <p className="mb-3 text-sm font-medium text-neutral-700">Logo do restaurante</p>
+                <ImageUpload
+                  value={form.logo}
+                  onChange={(url) => setForm((prev) => ({ ...prev, logo: url }))}
+                  folder="logos"
+                  label="Adicione a logo do seu restaurante"
+                  aspectRatio="square"
+                />
               </div>
 
               {error && (

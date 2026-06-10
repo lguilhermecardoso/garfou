@@ -25,6 +25,7 @@ export const createRestaurantSchema = z.object({
   address: z.string().optional(),
   city: z.string().optional(),
   state: z.string().optional(),
+  logo: z.string().url().optional().nullable(),
 });
 
 // ─── Menu ────────────────────────────────────────────────────
@@ -106,6 +107,7 @@ const baseProductSchema = z.object({
   price: z.number().min(0, "Preço não pode ser negativo"),
   sortOrder: z.number().int().default(0),
   isActive: z.boolean().default(true),
+  isPaused: z.boolean().default(false),
   isInternalOnly: z.boolean().default(false),
   isFeatured: z.boolean().default(false),
   allowCustomization: z.boolean().default(false),
@@ -114,6 +116,7 @@ const baseProductSchema = z.object({
   splitPriceRule: z.enum(["HIGHEST", "AVERAGE", "SUM"]).default("HIGHEST"),
   preparationTime: z.number().int().positive().optional(),
   costPrice: z.number().positive().optional(),
+  image: z.string().url().optional().nullable(),
   modifierGroups: z.array(modifierGroupSchema).default([]),
   splitFlavors: z.array(splitFlavorSchema).default([]),
 });

@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { QrCode } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TableQrModal } from "./table-qr-modal";
 
 type TableStatus = "AVAILABLE" | "OCCUPIED" | "RESERVED";
 
@@ -19,6 +21,8 @@ interface DiningTable {
 
 interface Props {
   restaurantId: string;
+  /** Restaurant slug used to build QR code menu URLs */
+  restaurantSlug: string;
 }
 
 const statusLabels: Record<TableStatus, string> = {
@@ -27,11 +31,12 @@ const statusLabels: Record<TableStatus, string> = {
   RESERVED: "Reservada",
 };
 
-export function TablesSettings({ restaurantId }: Props) {
+export function TablesSettings({ restaurantId, restaurantSlug }: Props) {
   const queryClient = useQueryClient();
   const [identifier, setIdentifier] = useState("");
   const [capacity, setCapacity] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [qrTable, setQrTable] = useState<DiningTable | null>(null);
 
   const { data: tables = [], isLoading } = useQuery<DiningTable[]>({
     queryKey: ["tables", restaurantId],
@@ -136,15 +141,34 @@ export function TablesSettings({ restaurantId }: Props) {
                       {table.capacity ? `${table.capacity} lugares` : "Capacidade não informada"}
                     </p>
                   </div>
-                  <Badge variant={table.status === "AVAILABLE" ? "secondary" : "outline"}>
-                    {statusLabels[table.status]}
-                  </Badge>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={table.status === "AVAILABLE" ? "secondary" : "outline"}>
+                      {statusLabels[table.status]}
+                    </Badge>
+                    <button
+                      onClick={() => setQrTable(table)}
+                      className="rounded-lg border border-neutral-200 p-1.5 text-neutral-500 hover:bg-neutral-50 hover:text-neutral-700"
+                      title="Ver QR Code"
+                      aria-label={`QR Code da Mesa ${table.identifier}`}
+                    >
+                      <QrCode className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* QR Code Modal */}
+      {qrTable && (
+        <TableQrModal
+          tableIdentifier={qrTable.identifier}
+          menuSlug={restaurantSlug}
+          onClose={() => setQrTable(null)}
+        />
+      )}
     </div>
   );
 }

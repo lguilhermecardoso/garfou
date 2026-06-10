@@ -2,7 +2,16 @@
 
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { CreditCard, Zap, Building2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
+import {
+  CreditCard,
+  Zap,
+  Building2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  CalendarDays,
+  ExternalLink,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Props {
@@ -14,6 +23,9 @@ interface BillingData {
   stripeSubscriptionId: string | null;
   subscriptionStatus: "TRIALING" | "ACTIVE" | "CANCELED" | "PAST_DUE" | "UNPAID";
   trialEndsAt: string | null;
+  currentPlanKey: string | null;
+  currentPeriodEnd: string | null;
+  cancelAtPeriodEnd: boolean;
   plans: {
     STARTER: { name: string; price: number; features: string[] };
     PRO: { name: string; price: number; features: string[] };
@@ -44,6 +56,14 @@ function formatBRL(cents: number) {
   return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 }
 
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 export function BillingSection({ restaurantId }: Props) {
   const { data, isLoading } = useQuery<{ data: BillingData }>({
     queryKey: ["billing", restaurantId],
@@ -62,7 +82,6 @@ export function BillingSection({ restaurantId }: Props) {
       return json as { url: string };
     },
     onSuccess: ({ url }) => {
-      toast.info("Redirecionando para o checkout...");
       window.location.href = url;
     },
     onError: (error) => {
@@ -80,7 +99,6 @@ export function BillingSection({ restaurantId }: Props) {
       return json as { url: string };
     },
     onSuccess: ({ url }) => {
-      toast.info("Abrindo portal de cobrança...");
       window.location.href = url;
     },
     onError: (error) => {
@@ -103,27 +121,74 @@ export function BillingSection({ restaurantId }: Props) {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-bold text-neutral-900">Assinatura e cobrança</h2>
         {isSubscribed && (
-          <Button variant="outline" onClick={() => portal.mutate()} disabled={portal.isPending}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => portal.mutate()}
+            disabled={portal.isPending}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" aria-hidden="true" />
             {portal.isPending ? "Abrindo portal..." : "Gerenciar assinatura"}
           </Button>
         )}
       </div>
 
-      {/* Status badge */}
-      <div
-        className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${statusInfo.color}`}
-      >
-        <StatusIcon className="h-4 w-4" aria-hidden="true" />
-        {statusInfo.label}
-        {billing.subscriptionStatus === "TRIALING" && billing.trialEndsAt && (
-          <span className="ml-1 font-normal">
-            · expira em {new Date(billing.trialEndsAt).toLocaleDateString("pt-BR")}
-          </span>
+      {/* Status row */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div
+          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium ${statusInfo.color}`}
+        >
+          <StatusIcon className="h-4 w-4" aria-hidden="true" />
+          {statusInfo.label}
+          {billing.subscriptionStatus === "TRIALING" && billing.trialEndsAt && (
+            <span className="ml-1 font-normal">· expira em {formatDate(billing.trialEndsAt)}</span>
+          )}
+        </div>
+
+        {billing.subscriptionStatus === "ACTIVE" && billing.currentPeriodEnd && (
+          <div className="inline-flex items-center gap-1.5 text-sm text-neutral-500">
+            <CalendarDays className="h-4 w-4" aria-hidden="true" />
+            {billing.cancelAtPeriodEnd
+              ? `Cancela em ${formatDate(billing.currentPeriodEnd)}`
+              : `Renova em ${formatDate(billing.currentPeriodEnd)}`}
+          </div>
         )}
       </div>
+
+      {/* Alerts */}
+      {billing.subscriptionStatus === "PAST_DUE" && (
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+          <div>
+            <p className="text-sm font-medium text-amber-800">Pagamento pendente</p>
+            <p className="text-sm text-amber-700">
+              Não foi possível cobrar seu cartão. Acesse o portal para atualizar o método de
+              pagamento.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2 border-amber-300 text-amber-700 hover:bg-amber-100"
+              onClick={() => portal.mutate()}
+              disabled={portal.isPending}
+            >
+              Atualizar pagamento
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {billing.cancelAtPeriodEnd && billing.currentPeriodEnd && (
+        <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm text-neutral-600">
+          ⚠️ Sua assinatura será cancelada em{" "}
+          <strong>{formatDate(billing.currentPeriodEnd)}</strong>. Você ainda pode reativá-la pelo
+          portal antes dessa data.
+        </div>
+      )}
 
       {/* Error states */}
       {checkout.isError && (
@@ -143,24 +208,44 @@ export function BillingSection({ restaurantId }: Props) {
           ([key, plan]) => {
             const Icon = PLAN_ICONS[key];
             const isPro = key === "PRO";
+            const isCurrentPlan = billing.currentPlanKey === key;
 
             return (
               <div
                 key={key}
-                className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm ${
-                  isPro ? "border-primary-400 ring-primary-400 ring-2" : "border-neutral-200"
+                className={`relative flex flex-col rounded-2xl border bg-white p-6 shadow-sm transition-all ${
+                  isCurrentPlan
+                    ? "border-emerald-400 ring-2 ring-emerald-400"
+                    : isPro
+                      ? "border-primary-400 ring-primary-400 ring-2"
+                      : "border-neutral-200"
                 }`}
               >
-                {isPro && (
+                {isCurrentPlan && (
+                  <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-3 py-0.5 text-xs font-semibold text-white">
+                    Plano atual
+                  </span>
+                )}
+                {!isCurrentPlan && isPro && (
                   <span className="bg-primary-500 absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-3 py-0.5 text-xs font-semibold text-white">
                     Recomendado
                   </span>
                 )}
 
                 <div className="mb-4 flex items-center gap-3">
-                  <div className={`rounded-xl p-2 ${isPro ? "bg-primary-50" : "bg-neutral-100"}`}>
+                  <div
+                    className={`rounded-xl p-2 ${
+                      isCurrentPlan ? "bg-emerald-50" : isPro ? "bg-primary-50" : "bg-neutral-100"
+                    }`}
+                  >
                     <Icon
-                      className={`h-5 w-5 ${isPro ? "text-primary-600" : "text-neutral-600"}`}
+                      className={`h-5 w-5 ${
+                        isCurrentPlan
+                          ? "text-emerald-600"
+                          : isPro
+                            ? "text-primary-600"
+                            : "text-neutral-600"
+                      }`}
                       aria-hidden="true"
                     />
                   </div>
@@ -185,18 +270,34 @@ export function BillingSection({ restaurantId }: Props) {
                   ))}
                 </ul>
 
-                <Button
-                  className="w-full"
-                  variant={isPro ? "default" : "outline"}
-                  disabled={isSubscribed || checkout.isPending}
-                  onClick={() => !isSubscribed && checkout.mutate(key)}
-                >
-                  {isSubscribed
-                    ? "Plano ativo"
-                    : checkout.isPending
-                      ? "Aguarde..."
-                      : "Assinar — 7 dias grátis"}
-                </Button>
+                {isCurrentPlan ? (
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={() => portal.mutate()}
+                    disabled={portal.isPending}
+                  >
+                    {portal.isPending ? "Abrindo portal..." : "Gerenciar"}
+                  </Button>
+                ) : isSubscribed ? (
+                  <Button
+                    className="w-full"
+                    variant={isPro ? "default" : "outline"}
+                    onClick={() => portal.mutate()}
+                    disabled={portal.isPending}
+                  >
+                    {portal.isPending ? "Aguarde..." : "Mudar para este plano"}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    variant={isPro ? "default" : "outline"}
+                    disabled={checkout.isPending}
+                    onClick={() => checkout.mutate(key)}
+                  >
+                    {checkout.isPending ? "Aguarde..." : "Assinar — 7 dias grátis"}
+                  </Button>
+                )}
               </div>
             );
           }
@@ -204,8 +305,8 @@ export function BillingSection({ restaurantId }: Props) {
       </div>
 
       <p className="text-xs text-neutral-500">
-        Os planos incluem 7 dias de teste grátis. Cancele a qualquer momento sem multa. Cobrança
-        mensal via cartão de crédito processada pelo Stripe.
+        Todos os planos incluem 7 dias de teste grátis. Cancele a qualquer momento sem multa.
+        Cobrança mensal via cartão de crédito processada pelo Stripe.
       </p>
     </div>
   );

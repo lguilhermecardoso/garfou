@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ShoppingCart, Plus, Minus, Search, ChefHat, X, Users, Store } from "lucide-react";
+import { PhoneInput } from "@/components/ui/masked-input";
 import { ProductDetailSheet } from "@/features/menu/product-detail-sheet";
 import {
   describeCartItem,
@@ -670,11 +671,10 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
                 </div>
                 <div>
                   <label className="text-sm font-medium text-neutral-700">Telefone</label>
-                  <input
+                  <PhoneInput
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
-                    placeholder="Opcional"
-                    className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm"
+                    className="mt-1"
                   />
                 </div>
               </div>

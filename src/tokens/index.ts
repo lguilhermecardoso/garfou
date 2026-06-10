@@ -1,4 +1,4 @@
-// Design System Tokens — GARFOU
+// Design System Tokens — chamou.delivery
 
 export const colors = {
   // Brand

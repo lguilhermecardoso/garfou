@@ -103,6 +103,7 @@ export function buildProductCreateInput(
     splitPriceRule: input.splitPriceRule,
     preparationTime: input.preparationTime,
     costPrice: input.costPrice,
+    image: input.image ?? undefined,
     modifierGroups: input.allowCustomization
       ? {
           create: input.modifierGroups.map((group) => ({
@@ -163,6 +164,7 @@ export async function syncProductCustomization(
         splitPriceRule: input.splitPriceRule,
         preparationTime: input.preparationTime,
         costPrice: input.costPrice,
+        ...(input.image !== undefined ? { image: input.image } : {}),
       },
     });
 

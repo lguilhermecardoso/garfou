@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     );
   }
 
-  const { name, phone, address, city, state } = parsed.data;
+  const { name, phone, address, city, state, logo } = parsed.data;
 
   try {
     // Verificar se o usuário existe no banco
@@ -101,6 +101,7 @@ export async function POST(req: Request) {
         address,
         city,
         state,
+        ...(logo ? { logo } : {}),
         settings: {
           plan: userPlan, // Herda o plano do primeiro restaurante, ou STARTER se for o primeiro
         },

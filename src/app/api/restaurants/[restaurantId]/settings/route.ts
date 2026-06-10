@@ -13,6 +13,7 @@ const updateSchema = z.object({
   city: z.string().optional(),
   state: z.string().max(2).optional(),
   logo: z.string().url().optional().nullable(),
+  banner: z.string().url().optional().nullable(),
   isOpen: z.boolean().optional(),
   settings: z.record(z.string(), z.unknown()).optional(),
 });
@@ -20,7 +21,8 @@ const updateSchema = z.object({
 export async function GET(_req: Request, { params }: Params) {
   const { restaurantId } = await params;
   const access = await requireRole(restaurantId, "MANAGER");
-  if ("error" in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if ("error" in access)
+    return NextResponse.json({ error: access.error }, { status: access.status });
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { id: restaurantId, deletedAt: null },
@@ -33,19 +35,24 @@ export async function GET(_req: Request, { params }: Params) {
     },
   });
 
-  if (!restaurant) return NextResponse.json({ error: "Restaurante não encontrado" }, { status: 404 });
+  if (!restaurant)
+    return NextResponse.json({ error: "Restaurante não encontrado" }, { status: 404 });
   return NextResponse.json({ data: restaurant });
 }
 
 export async function PATCH(req: Request, { params }: Params) {
   const { restaurantId } = await params;
   const access = await requireRole(restaurantId, "OWNER");
-  if ("error" in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if ("error" in access)
+    return NextResponse.json({ error: access.error }, { status: access.status });
 
   const body = await req.json();
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Dados inválidos", details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Dados inválidos", details: parsed.error.flatten() },
+      { status: 400 }
+    );
   }
 
   const restaurant = await prisma.restaurant.update({

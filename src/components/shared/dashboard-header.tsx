@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, Menu, X, Building2, ChevronDown } from "lucide-react";
+import { Bell, LogOut, Menu, X, Building2, ChevronDown, Store } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { logoutAction } from "@/features/auth/actions";
 import { useNotifications } from "@/hooks/use-notifications";
@@ -28,8 +28,37 @@ export function DashboardHeader({ restaurantId, user }: Props) {
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [currentRestaurant, setCurrentRestaurant] = useState<Restaurant | null>(null);
   const [loadingRestaurants, setLoadingRestaurants] = useState(true);
+  const [isOpen, setIsOpen] = useState<boolean | null>(null);
+  const [togglingStore, setTogglingStore] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead, clearAll } = useNotifications(restaurantId);
+
+  // Carrega status da loja
+  useEffect(() => {
+    async function loadStoreStatus() {
+      try {
+        const res = await fetch(`/api/user/restaurants`);
+        if (res.ok) {
+          const data = await res.json();
+          const current = data.restaurants?.find((r: Restaurant) => r.id === restaurantId);
+          if (current) setIsOpen(current.isOpen ?? false);
+        }
+      } catch {}
+    }
+    loadStoreStatus();
+  }, [restaurantId]);
+
+  async function handleToggleStore() {
+    setTogglingStore(true);
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/toggle-store`, { method: "PATCH" });
+      if (res.ok) {
+        const data = await res.json();
+        setIsOpen(data.data.isOpen);
+      }
+    } catch {}
+    setTogglingStore(false);
+  }
 
   // Carrega lista de restaurantes do usuário
   useEffect(() => {
@@ -145,12 +174,32 @@ export function DashboardHeader({ restaurantId, user }: Props) {
                   </div>
 
                   <div className="border-t border-neutral-200 p-2">
-                    <NewRestaurantButton restaurantId={restaurantId} />
+                    <NewRestaurantButton />
                   </div>
                 </div>
               </>
             )}
           </div>
+        )}
+
+        {/* Store open/close toggle */}
+        {isOpen !== null && (
+          <button
+            onClick={handleToggleStore}
+            disabled={togglingStore}
+            className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              isOpen
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                : "border-red-300 bg-red-50 text-red-700 hover:bg-red-100"
+            }`}
+            aria-label={
+              isOpen ? "Loja aberta — clique para fechar" : "Loja fechada — clique para abrir"
+            }
+            title={isOpen ? "Loja aberta — clique para fechar" : "Loja fechada — clique para abrir"}
+          >
+            <Store className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="hidden sm:inline">{isOpen ? "Aberta" : "Fechada"}</span>
+          </button>
         )}
 
         {/* Notifications Button */}

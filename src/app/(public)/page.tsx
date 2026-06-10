@@ -10,6 +10,7 @@ import {
   BarChart3,
   Printer,
   Shield,
+  Flame,
   Zap,
   Star,
   ArrowRight,
@@ -38,8 +39,8 @@ export default async function LandingPage() {
       <header className="sticky top-0 z-50 border-b border-neutral-100 bg-white/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           <div className="flex items-center gap-2">
-            <UtensilsCrossed className="text-primary-500 h-7 w-7" aria-hidden="true" />
-            <span className="text-xl font-bold text-neutral-900">GARFOU</span>
+            <Flame className="text-primary-500 h-7 w-7" aria-hidden="true" />
+            <span className="text-xl font-bold text-neutral-900">chamou.delivery</span>
           </div>
           <nav className="hidden items-center gap-6 md:flex" aria-label="Navegação principal">
             <a
@@ -106,7 +107,7 @@ export default async function LandingPage() {
           <div className="flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
             <Link href={userId ? systemHref : "/auth/signup"}>
               <Button size="xl" className="w-full sm:w-auto">
-                {userId ? "Acessar sistema" : "Começar 14 dias grátis"}
+                {userId ? "Acessar sistema" : "Começar 7 dias grátis"}
                 <ArrowRight className="h-5 w-5" aria-hidden="true" />
               </Button>
             </Link>
@@ -159,7 +160,7 @@ export default async function LandingPage() {
               Planos simples e transparentes
             </h2>
             <p className="text-lg text-neutral-500">
-              Comece grátis por 14 dias. Sem surpresas na fatura.
+              Comece grátis por 7 dias. Sem surpresas na fatura.
             </p>
           </div>
           <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
@@ -236,7 +237,7 @@ export default async function LandingPage() {
             Pronto para transformar seu restaurante?
           </h2>
           <p className="text-primary-100 mb-8 text-lg">
-            Junte-se a centenas de restaurantes que já usam o GARFOU.
+            Junte-se a centenas de restaurantes que já usam o chamou.delivery.
           </p>
           <Link href={userId ? systemHref : "/auth/signup"}>
             <Button
@@ -255,11 +256,11 @@ export default async function LandingPage() {
       <footer className="border-t border-neutral-200 px-4 py-8 sm:px-6">
         <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
           <div className="flex items-center gap-2">
-            <UtensilsCrossed className="text-primary-500 h-5 w-5" aria-hidden="true" />
-            <span className="font-semibold text-neutral-700">GARFOU</span>
+            <Flame className="text-primary-500 h-5 w-5" aria-hidden="true" />
+            <span className="font-semibold text-neutral-700">chamou.delivery</span>
           </div>
           <p className="text-sm text-neutral-400">
-            © {new Date().getFullYear()} GARFOU. Todos os direitos reservados.
+            © {new Date().getFullYear()} chamou.delivery. Todos os direitos reservados.
           </p>
         </div>
       </footer>
@@ -307,11 +308,11 @@ const features = [
 const faqs = [
   {
     q: "Preciso instalar alguma coisa?",
-    a: "Não. O GARFOU roda 100% no navegador. Para impressão térmica automática, existe um agente local opcional para Windows e Linux.",
+    a: "Não. O chamou.delivery roda 100% no navegador. Para impressão térmica automática, existe um agente local opcional para Windows e Linux.",
   },
   {
     q: "Funciona no celular?",
-    a: "Sim! O GARFOU é mobile-first. O app do garçom e a tela de cozinha foram projetados especialmente para tablets e smartphones.",
+    a: "Sim! O chamou.delivery é mobile-first. O app do garçom e a tela de cozinha foram projetados especialmente para tablets e smartphones.",
   },
   {
     q: "Posso gerenciar vários restaurantes?",
@@ -319,10 +320,10 @@ const faqs = [
   },
   {
     q: "O que acontece depois do trial?",
-    a: "Após 14 dias, você escolhe um plano. Se não assinar, o acesso é suspenso mas seus dados ficam preservados por 30 dias.",
+    a: "Após 7 dias, você escolhe um plano. Se não assinar, o acesso é suspenso mas seus dados ficam preservados por 30 dias.",
   },
   {
     q: "Como funciona o cardápio digital?",
-    a: "Cada restaurante recebe uma URL personalizada (garfou.app/menu/seu-restaurante) e um QR Code. Clientes fazem pedidos sem precisar de login.",
+    a: "Cada restaurante recebe uma URL personalizada (chamou.delivery/menu/seu-restaurante) e um QR Code. Clientes fazem pedidos sem precisar de login.",
   },
 ];

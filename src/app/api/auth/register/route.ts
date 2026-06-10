@@ -3,6 +3,17 @@ import { prisma } from "@/lib/db";
 import { hash } from "bcryptjs";
 import { signUpSchema } from "@/lib/validations";
 import { checkRateLimit, getRequestIp } from "@/lib/rate-limit";
+import { z } from "zod";
+
+const registerExtSchema = signUpSchema.extend({
+  cpf: z.string().optional(),
+  cnpj: z.string().optional(),
+  companyName: z.string().optional(),
+  companyAddress: z.string().optional(),
+  companyCEP: z.string().optional(),
+  companyCity: z.string().optional(),
+  companyState: z.string().max(2).optional(),
+});
 
 export async function POST(req: NextRequest) {
   const ip = getRequestIp(req);
@@ -21,12 +32,23 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const parsed = signUpSchema.safeParse(body);
+  const parsed = registerExtSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Dados inválidos." }, { status: 400 });
   }
 
-  const { name, email, password } = parsed.data;
+  const {
+    name,
+    email,
+    password,
+    cpf,
+    cnpj,
+    companyName,
+    companyAddress,
+    companyCEP,
+    companyCity,
+    companyState,
+  } = parsed.data;
 
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) {
@@ -35,7 +57,18 @@ export async function POST(req: NextRequest) {
 
   const passwordHash = await hash(password, 12);
   const user = await prisma.user.create({
-    data: { name, email, passwordHash },
+    data: {
+      name,
+      email,
+      passwordHash,
+      ...(cpf ? { cpf } : {}),
+      ...(cnpj ? { cnpj } : {}),
+      ...(companyName ? { companyName } : {}),
+      ...(companyAddress ? { companyAddress } : {}),
+      ...(companyCEP ? { companyCEP } : {}),
+      ...(companyCity ? { companyCity } : {}),
+      ...(companyState ? { companyState } : {}),
+    },
     select: { id: true, name: true, email: true },
   });
 

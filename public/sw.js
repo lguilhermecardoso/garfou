@@ -1,5 +1,5 @@
-const APP_SHELL_CACHE = "garfou-app-shell-v1";
-const RUNTIME_CACHE = "garfou-runtime-v1";
+const APP_SHELL_CACHE = "chamou-app-shell-v1";
+const RUNTIME_CACHE = "chamou-runtime-v1";
 const APP_SHELL_ASSETS = ["/", "/manifest.json", "/icons/icon-192.svg", "/icons/icon-512.svg"];
 
 self.addEventListener("install", (event) => {

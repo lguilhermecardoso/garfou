@@ -5,7 +5,9 @@ import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Save, Store, Clock, Globe } from "lucide-react";
+import { ImageUpload } from "@/components/ui/image-upload";
+import { PhoneInput } from "@/components/ui/masked-input";
+import { Save, Store, Clock, Globe, ImageIcon } from "lucide-react";
 
 interface Props {
   restaurantId: string;
@@ -20,6 +22,7 @@ interface Restaurant {
   city: string | null;
   state: string | null;
   logo: string | null;
+  banner: string | null;
   isOpen: boolean;
   settings: Record<string, unknown>;
 }
@@ -33,6 +36,8 @@ export function SettingsForm({ restaurantId }: Props) {
     address: "",
     city: "",
     state: "",
+    logo: null as string | null,
+    banner: null as string | null,
     isOpen: false,
   });
 
@@ -53,6 +58,8 @@ export function SettingsForm({ restaurantId }: Props) {
         address: restaurant.address ?? "",
         city: restaurant.city ?? "",
         state: restaurant.state ?? "",
+        logo: restaurant.logo,
+        banner: restaurant.banner,
         isOpen: restaurant.isOpen,
       });
     }
@@ -108,10 +115,9 @@ export function SettingsForm({ restaurantId }: Props) {
           onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
           required
         />
-        <Input
+        <PhoneInput
           label="Telefone / WhatsApp"
           id="phone"
-          type="tel"
           value={form.phone}
           onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
         />
@@ -137,6 +143,36 @@ export function SettingsForm({ restaurantId }: Props) {
             }
             maxLength={2}
           />
+        </div>
+      </div>
+
+      {/* Identidade visual */}
+      <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-neutral-100 pb-2">
+          <ImageIcon className="text-primary-500 h-5 w-5" aria-hidden="true" />
+          <h2 className="font-semibold text-neutral-900">Identidade visual</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <p className="mb-2 text-sm font-medium text-neutral-700">Logo do restaurante</p>
+            <ImageUpload
+              value={form.logo}
+              onChange={(url) => setForm((p) => ({ ...p, logo: url }))}
+              folder="logos"
+              label="Adicionar logo"
+              aspectRatio="square"
+            />
+          </div>
+          <div>
+            <p className="mb-2 text-sm font-medium text-neutral-700">Banner do cardápio</p>
+            <ImageUpload
+              value={form.banner}
+              onChange={(url) => setForm((p) => ({ ...p, banner: url }))}
+              folder="banners"
+              label="Adicionar banner"
+              aspectRatio="banner"
+            />
+          </div>
         </div>
       </div>
 

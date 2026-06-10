@@ -27,11 +27,12 @@ export async function toastPromise<T>(
     error?: string | ((error: unknown) => string);
   }
 ): Promise<T> {
-  return toast.promise(promise, {
+  toast.promise(promise, {
     loading: options.loading,
     success: options.success,
     error: options.error || "Ocorreu um erro",
   });
+  return promise;
 }
 
 /**

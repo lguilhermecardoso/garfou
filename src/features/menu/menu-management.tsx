@@ -15,7 +15,9 @@ import {
   ChevronRight,
   EyeOff,
   PackageX,
+  Pause,
   Pencil,
+  Play,
   Plus,
   Split,
   Star,
@@ -24,6 +26,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ImageUpload } from "@/components/ui/image-upload";
 import {
   ProductCustomizationPanel,
   type ProductCustomizationFormState,
@@ -44,15 +47,37 @@ interface Props {
   restaurantId: string;
 }
 
+/** The reserved name for the auto-managed adicionais ADDON group */
+const ADICIONAIS_GROUP_NAME = "Adicionais";
+
 function getInitialCustomization(initial?: Product): ProductCustomizationFormState {
   return {
     allowCustomization: initial?.allowCustomization ?? false,
     allowSplit: initial?.allowSplit ?? false,
     maxSplits: initial?.maxSplits ?? 2,
     splitPriceRule: initial?.splitPriceRule ?? "HIGHEST",
-    modifierGroups: initial?.modifierGroups ?? [],
+    // Exclude the auto-managed "Adicionais" ADDON group — it lives in the simple adicionais UI
+    modifierGroups:
+      initial?.modifierGroups?.filter(
+        (g) => !(g.type === "ADDON" && g.name === ADICIONAIS_GROUP_NAME)
+      ) ?? [],
     splitFlavors: initial?.splitFlavors ?? [],
   };
+}
+
+function getInitialAdicionais(
+  initial?: Product
+): Array<{ id: string; name: string; price: string }> {
+  const group = initial?.modifierGroups?.find(
+    (g) => g.type === "ADDON" && g.name === ADICIONAIS_GROUP_NAME
+  );
+  return (
+    group?.options.map((opt) => ({
+      id: opt.id,
+      name: opt.name,
+      price: opt.price > 0 ? String(opt.price) : "",
+    })) ?? []
+  );
 }
 
 function CategoryModal({
@@ -144,9 +169,14 @@ function ProductModal({
     categoryId: initial?.categoryId ?? defaultCategoryId ?? categories[0]?.id ?? "",
     isFeatured: initial?.isFeatured ?? false,
     isInternalOnly: initial?.isInternalOnly ?? false,
+    image: (initial?.image ?? null) as string | null,
   });
   const [customization, setCustomization] = useState<ProductCustomizationFormState>(
     getInitialCustomization(initial)
+  );
+  /** Simple adicionais rows — managed as a dedicated ADDON group on save */
+  const [adicionais, setAdicionais] = useState<Array<{ id: string; name: string; price: string }>>(
+    getInitialAdicionais(initial)
   );
   const [loading, setLoading] = useState(false);
   const splitPricingActive = customization.allowSplit;
@@ -158,10 +188,49 @@ function ProductModal({
   async function handleSave() {
     setLoading(true);
     try {
+      // Build the final modifier groups: advanced groups + auto-managed adicionais group
+      const validAdicionais = adicionais.filter((a) => a.name.trim());
+      const adicionaisGroup =
+        validAdicionais.length > 0
+          ? [
+              {
+                // No id — let the DB generate one
+                name: ADICIONAIS_GROUP_NAME,
+                type: "ADDON" as const,
+                minSelections: 0,
+                maxSelections: 99,
+                sortOrder: 0,
+                options: validAdicionais.map((a, idx) => ({
+                  // No id — let the DB generate one
+                  name: a.name.trim(),
+                  price: Number(a.price) || 0,
+                  isDefault: false,
+                  isAvailable: true,
+                  sortOrder: idx,
+                })),
+              },
+            ]
+          : [];
+
+      // Strip temp IDs from advanced modifier groups/options before sending
+      const cleanGroups = customization.modifierGroups.map((g) => ({
+        ...g,
+        id: g.id?.startsWith("temp-") ? undefined : g.id,
+        options: g.options.map((o) => ({
+          ...o,
+          id: o.id?.startsWith("temp-") ? undefined : o.id,
+        })),
+      }));
+
+      const mergedGroups = [...adicionaisGroup, ...cleanGroups];
+      const hasCustomization = mergedGroups.length > 0 || customization.allowCustomization;
+
       const payload = {
         ...form,
         price: splitPricingActive ? 0 : Number(form.price || 0),
         ...customization,
+        allowCustomization: hasCustomization,
+        modifierGroups: mergedGroups,
       };
 
       const endpoint = initial
@@ -241,6 +310,17 @@ function ProductModal({
             />
           </div>
 
+          <div>
+            <p className="mb-2 text-sm font-medium text-neutral-700">Foto do produto</p>
+            <ImageUpload
+              value={form.image}
+              onChange={(url) => setForm((c) => ({ ...c, image: url }))}
+              folder="products"
+              label="Adicionar foto"
+              aspectRatio="video"
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1 text-sm text-neutral-700">
               <span className="block text-sm font-medium">Categoria</span>
@@ -284,6 +364,87 @@ function ProductModal({
             currentProductId={initial?.id}
             onChange={setCustomization}
           />
+
+          {/* ── Adicionais simples ──────────────────────────────────────── */}
+          <div className="space-y-3 rounded-2xl border border-neutral-200 p-4">
+            <div>
+              <h3 className="text-sm font-semibold text-neutral-900">Adicionais extras</h3>
+              <p className="text-xs text-neutral-500">
+                Ingredientes ou itens que o cliente pode adicionar ao pedido. Cada adicional soma no
+                preço final.
+              </p>
+            </div>
+
+            {adicionais.length > 0 && (
+              <div className="space-y-2">
+                {adicionais.map((addon, idx) => (
+                  <div
+                    key={addon.id}
+                    className="grid grid-cols-[1fr_auto_auto] gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2"
+                  >
+                    <input
+                      type="text"
+                      value={addon.name}
+                      onChange={(e) => {
+                        const next = adicionais.slice();
+                        next[idx] = { ...next[idx], name: e.target.value };
+                        setAdicionais(next);
+                      }}
+                      placeholder="Ex: Salsicha extra, Catupiry..."
+                      className="focus:ring-primary-400 min-w-0 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm focus:ring-2 focus:outline-none"
+                    />
+                    <div className="relative">
+                      <span className="pointer-events-none absolute top-1/2 left-2 -translate-y-1/2 text-xs text-neutral-400">
+                        +R$
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={addon.price}
+                        onChange={(e) => {
+                          const next = adicionais.slice();
+                          next[idx] = { ...next[idx], price: e.target.value };
+                          setAdicionais(next);
+                        }}
+                        placeholder="0,00"
+                        className="focus:ring-primary-400 w-24 rounded-lg border border-neutral-200 bg-white py-1.5 pr-2 pl-7 text-sm focus:ring-2 focus:outline-none"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setAdicionais(adicionais.filter((_, i) => i !== idx))}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-400 hover:bg-red-50 hover:text-red-500"
+                      aria-label="Remover adicional"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {adicionais.length === 0 && (
+              <p className="text-xs text-neutral-400">
+                Nenhum adicional configurado. Clique em &quot;Adicionar&quot; para começar.
+              </p>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                setAdicionais([
+                  ...adicionais,
+                  { id: `new-${crypto.randomUUID()}`, name: "", price: "" },
+                ])
+              }
+            >
+              <Plus className="h-4 w-4" />
+              Adicionar
+            </Button>
+          </div>
         </div>
         <div className="mt-6 flex gap-3">
           <Button variant="outline" className="flex-1" onClick={onClose}>
@@ -378,6 +539,29 @@ export function MenuManagement({ restaurantId }: Props) {
     onSuccess: (_, { isActive }) => {
       queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
       toast.success(isActive ? "Produto ativado!" : "Produto desativado!");
+    },
+    onError: () => {
+      toast.error("Erro ao atualizar produto.");
+    },
+  });
+
+  const pauseProduct = useMutation({
+    mutationFn: async ({ id, isPaused }: { id: string; isPaused: boolean }) => {
+      const res = await fetch(`/api/restaurants/${restaurantId}/products/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isPaused }),
+      });
+      if (!res.ok) throw new Error("Erro ao pausar produto");
+      return res;
+    },
+    onSuccess: (_, { isPaused }) => {
+      queryClient.invalidateQueries({ queryKey: ["products", restaurantId] });
+      toast.success(
+        isPaused
+          ? "Produto pausado — aparece como esgotado no menu."
+          : "Produto disponível novamente!"
+      );
     },
     onError: () => {
       toast.error("Erro ao atualizar produto.");
@@ -490,7 +674,7 @@ export function MenuManagement({ restaurantId }: Props) {
                       categoryProducts.map((product, index) => (
                         <div
                           key={product.id}
-                          className={`flex items-center gap-3 px-4 py-3 ${index < categoryProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : ""}`}
+                          className={`flex items-center gap-3 px-4 py-3 ${index < categoryProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : product.isPaused ? "opacity-70" : ""}`}
                         >
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
@@ -525,6 +709,11 @@ export function MenuManagement({ restaurantId }: Props) {
                                   Inativo
                                 </Badge>
                               )}
+                              {product.isPaused && (
+                                <Badge className="bg-amber-100 text-xs text-amber-700 hover:bg-amber-100">
+                                  Pausado
+                                </Badge>
+                              )}
                             </div>
                             {product.description && (
                               <p className="truncate text-xs text-neutral-400">
@@ -536,6 +725,34 @@ export function MenuManagement({ restaurantId }: Props) {
                             {formatCurrency(product.price)}
                           </span>
                           <div className="flex shrink-0 items-center gap-1">
+                            <button
+                              onClick={() =>
+                                pauseProduct.mutate({
+                                  id: product.id,
+                                  isPaused: !(product.isPaused ?? false),
+                                })
+                              }
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${(product.isPaused ?? false) ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-neutral-100 text-neutral-500 hover:bg-amber-50 hover:text-amber-600"}`}
+                              aria-label={
+                                (product.isPaused ?? false)
+                                  ? "Retomar produto"
+                                  : "Pausar produto (esgotado por agora)"
+                              }
+                              title={
+                                (product.isPaused ?? false)
+                                  ? "Clique para retomar"
+                                  : "Pausar — aparece como esgotado no menu"
+                              }
+                            >
+                              {(product.isPaused ?? false) ? (
+                                <span className="flex items-center gap-1">
+                                  <Play className="h-3 w-3" aria-hidden="true" />
+                                  Pausado
+                                </span>
+                              ) : (
+                                <Pause className="h-3 w-3" aria-hidden="true" />
+                              )}
+                            </button>
                             <button
                               onClick={() =>
                                 toggleProduct.mutate({

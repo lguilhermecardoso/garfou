@@ -42,6 +42,7 @@ export interface MenuProductData {
   isFeatured?: boolean;
   isInternalOnly?: boolean;
   isActive?: boolean;
+  isPaused?: boolean;
   categoryId?: string;
   category?: { id: string; name: string };
   allowCustomization: boolean;

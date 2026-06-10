@@ -11,6 +11,7 @@ export interface DeviceAuth {
   sessionId: string;
   restaurantId: string;
   deviceType: "WAITER" | "KITCHEN";
+  createdBy: string;
   restaurant: {
     id: string;
     name: string;
@@ -50,6 +51,7 @@ export async function validateBearerToken(
           select: {
             type: true,
             isActive: true,
+            createdBy: true,
           },
         },
         restaurant: {
@@ -81,6 +83,7 @@ export async function validateBearerToken(
       sessionId: session.id,
       restaurantId: session.restaurantId,
       deviceType: session.token.type as "WAITER" | "KITCHEN",
+      createdBy: session.token.createdBy,
       restaurant: session.restaurant,
     };
   } catch (error) {

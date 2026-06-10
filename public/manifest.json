@@ -1,6 +1,6 @@
 {
-  "name": "GARFOU",
-  "short_name": "GARFOU",
+  "name": "chamou.delivery",
+  "short_name": "chamou.delivery",
   "description": "Plataforma de gestão para restaurantes",
   "start_url": "/",
   "display": "standalone",
@@ -21,11 +21,7 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": [
-    "food",
-    "productivity",
-    "business"
-  ],
+  "categories": ["food", "productivity", "business"],
   "shortcuts": [
     {
       "name": "Cozinha",

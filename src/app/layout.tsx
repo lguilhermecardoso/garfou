@@ -7,8 +7,8 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
   title: {
-    default: "GARFOU — Sistema para Restaurantes",
-    template: "%s | GARFOU",
+    default: "chamou.delivery — Sistema para Restaurantes",
+    template: "%s | chamou.delivery",
   },
   description:
     "ERP moderno para restaurantes. Cardápio digital, pedidos, cozinha, gestão financeira e muito mais.",
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "GARFOU",
+    title: "chamou.delivery",
   },
 };
 
@@ -28,14 +28,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning className={inter.variable}>
-      <body className="min-h-full flex flex-col font-sans antialiased">
+      <body className="flex min-h-full flex-col font-sans antialiased">
         <Providers>{children}</Providers>
       </body>
     </html>

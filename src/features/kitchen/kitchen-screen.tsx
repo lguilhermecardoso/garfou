@@ -5,13 +5,66 @@ import { toast } from "sonner";
 import { OrderStatusBadge } from "@/components/shared/order-status-badge";
 import { Button } from "@/components/ui/button";
 
-import { Loader2, RefreshCw, ChefHat, CheckCheck } from "lucide-react";
+import {
+  Loader2,
+  RefreshCw,
+  ChefHat,
+  CheckCheck,
+  Truck,
+  UtensilsCrossed,
+  ShoppingBag,
+  Clock,
+  AlertTriangle,
+} from "lucide-react";
 import { useEffect, useRef, useCallback, useState } from "react";
+
+// ─── SLA Configuration ────────────────────────────────────────────────────────
+/** Target kitchen-ready time in minutes, by order type */
+const SLA_TARGETS: Record<string, number> = {
+  DELIVERY: 20,
+  DINE_IN: 18,
+  TAKEOUT: 12,
+};
+const SLA_DEFAULT = 18;
+
+type Urgency = "ok" | "warning" | "critical" | "overdue";
+
+function getSlaTarget(orderType: string): number {
+  return SLA_TARGETS[orderType] ?? SLA_DEFAULT;
+}
+
+function getUrgency(elapsedMin: number, targetMin: number): Urgency {
+  const pct = elapsedMin / targetMin;
+  if (pct >= 1) return "overdue";
+  if (pct >= 0.85) return "critical";
+  if (pct >= 0.6) return "warning";
+  return "ok";
+}
+
+const URGENCY_ORDER: Record<Urgency, number> = { overdue: 0, critical: 1, warning: 2, ok: 3 };
+
+// ─── Order type display ────────────────────────────────────────────────────────
+const ORDER_TYPE_META: Record<string, { label: string; Icon: React.ElementType; color: string }> = {
+  DELIVERY: { label: "Delivery", Icon: Truck, color: "text-blue-400" },
+  DINE_IN: { label: "Mesa", Icon: UtensilsCrossed, color: "text-emerald-400" },
+  TAKEOUT: { label: "Retirada", Icon: ShoppingBag, color: "text-purple-400" },
+};
 
 interface Props {
   restaurantId: string;
   bearerToken?: string; // Se fornecido, usa BFF
 }
+
+/**
+ * KitchenScreen
+ *
+ * Full-screen KDS (Kitchen Display System) with:
+ * - Live polling at 3s intervals
+ * - SLA timer per order: OK → WARNING → CRITICAL → OVERDUE
+ * - Order type badges: Delivery / Mesa / Retirada
+ * - Cards sorted by urgency (most delayed first within each status group)
+ * - Audio alert on new orders
+ */
 
 async function fetchKitchenOrders(restaurantId: string, bearerToken?: string) {
   if (bearerToken) {
@@ -92,7 +145,7 @@ export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
   const [nowMs, setNowMs] = useState(() => Date.now());
 
   useEffect(() => {
-    const timer = setInterval(() => setNowMs(Date.now()), 30_000);
+    const timer = setInterval(() => setNowMs(Date.now()), 10_000);
     return () => clearInterval(timer);
   }, []);
 
@@ -202,6 +255,18 @@ export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
     (o) => o.status === "NOVO_PEDIDO" || o.status === "AGUARDANDO_CONFIRMACAO"
   );
 
+  // Sort each group by urgency — most delayed first
+  function sortByUrgency(list: KitchenOrder[]) {
+    return [...list].sort((a, b) => {
+      const elA = Math.floor((nowMs - new Date(a.createdAt).getTime()) / 60000);
+      const elB = Math.floor((nowMs - new Date(b.createdAt).getTime()) / 60000);
+      const uA = URGENCY_ORDER[getUrgency(elA, getSlaTarget(a.type))];
+      const uB = URGENCY_ORDER[getUrgency(elB, getSlaTarget(b.type))];
+      if (uA !== uB) return uA - uB; // most urgent first
+      return elB - elA; // then by elapsed time descending
+    });
+  }
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       {/* Header */}
@@ -234,7 +299,7 @@ export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
       ) : (
         <div className="grid grid-cols-1 gap-4 p-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {/* New — need confirmation */}
-          {newOrders.map((order) => (
+          {sortByUrgency(newOrders).map((order) => (
             <KitchenCard
               key={order.id}
               order={order}
@@ -247,7 +312,7 @@ export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
             />
           ))}
           {/* Confirmed — need to start prep */}
-          {confirmedOrders.map((order) => (
+          {sortByUrgency(confirmedOrders).map((order) => (
             <KitchenCard
               key={order.id}
               order={order}
@@ -258,7 +323,7 @@ export default function KitchenScreen({ restaurantId, bearerToken }: Props) {
             />
           ))}
           {/* In preparation */}
-          {inPreparationOrders.map((order) => (
+          {sortByUrgency(inPreparationOrders).map((order) => (
             <KitchenCard
               key={order.id}
               order={order}
@@ -293,119 +358,181 @@ function KitchenCard({
 }) {
   const isAwaitingConfirmation =
     order.status === "NOVO_PEDIDO" || order.status === "AGUARDANDO_CONFIRMACAO";
-  const isNew = order.status === "CONFIRMADO";
+  const isConfirmed = order.status === "CONFIRMADO";
   const elapsedMinutes = Math.floor((nowMs - new Date(order.createdAt).getTime()) / 60000);
+  const slaTarget = getSlaTarget(order.type);
+  const urgency = getUrgency(elapsedMinutes, slaTarget);
+  const progressPct = Math.min((elapsedMinutes / slaTarget) * 100, 100);
+
+  // If order is awaiting confirmation it always gets the red "NOVO" treatment
+  const effectiveUrgency: Urgency = isAwaitingConfirmation ? "overdue" : urgency;
+
+  const typeMeta = ORDER_TYPE_META[order.type] ?? ORDER_TYPE_META.DINE_IN;
+  const TypeIcon = typeMeta.Icon;
+
+  const cardBorder: Record<Urgency, string> = {
+    ok: "border-neutral-700",
+    warning: "border-yellow-500 shadow-[0_0_12px_rgba(234,179,8,0.25)]",
+    critical: "border-orange-500 shadow-[0_0_16px_rgba(249,115,22,0.3)]",
+    overdue: "border-red-500 shadow-[0_0_22px_rgba(239,68,68,0.4)]",
+  };
+
+  const progressColor: Record<Urgency, string> = {
+    ok: "bg-emerald-500",
+    warning: "bg-yellow-500",
+    critical: "bg-orange-500",
+    overdue: "bg-red-500",
+  };
 
   return (
     <article
-      className={`rounded-xl border-2 p-4 transition-all ${
-        isAwaitingConfirmation
-          ? "animate-pulse-border border-red-500 bg-neutral-900 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
-          : isNew
-            ? "border-accent-400 bg-neutral-900 shadow-[0_0_20px_rgba(245,155,5,0.2)]"
-            : "border-neutral-700 bg-neutral-900"
-      }`}
+      className={`relative rounded-xl border-2 bg-neutral-900 transition-all ${
+        cardBorder[effectiveUrgency]
+      } ${effectiveUrgency === "critical" || isAwaitingConfirmation ? "animate-pulse" : ""}`}
       aria-label={`Pedido #${order.orderNumber}`}
     >
-      <div className="mb-3 flex items-start justify-between">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">#{order.orderNumber}</span>
-            {isAwaitingConfirmation && (
-              <span className="animate-pulse rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
-                NOVO!
-              </span>
-            )}
-            {isNew && (
-              <span className="bg-accent-400 animate-pulse rounded-full px-2 py-0.5 text-xs font-bold text-neutral-900">
-                NOVO
-              </span>
-            )}
-          </div>
-          {order.tableNumber && (
-            <p className="text-sm text-neutral-400">Mesa {order.tableNumber}</p>
-          )}
-        </div>
-        <div className="text-right">
-          <OrderStatusBadge status={order.status} />
-          <p
-            className={`mt-1 text-xs ${elapsedMinutes > 15 ? "text-red-400" : "text-neutral-500"}`}
-          >
-            {elapsedMinutes}min atrás
-          </p>
-        </div>
+      {/* SLA progress bar — top of card */}
+      <div className="h-1.5 w-full overflow-hidden rounded-t-xl bg-neutral-800">
+        <div
+          className={`h-full transition-all duration-1000 ${progressColor[effectiveUrgency]}`}
+          style={{ width: `${progressPct}%` }}
+          aria-hidden="true"
+        />
       </div>
 
-      {/* Items */}
-      <ul className="mb-4 space-y-2" aria-label="Itens do pedido">
-        {order.items.map((item) => (
-          <li key={item.id} className="rounded-lg bg-neutral-800 p-3">
-            <div className="flex items-baseline gap-2">
-              <span className="text-accent-400 text-lg font-bold">{item.quantity}×</span>
-              <span className="font-medium">{item.product.name}</span>
+      <div className="p-4">
+        {/* Header row */}
+        <div className="mb-3 flex items-start justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-2xl font-bold">#{order.orderNumber}</span>
+              {isAwaitingConfirmation && (
+                <span className="rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">
+                  NOVO!
+                </span>
+              )}
+              {isConfirmed && (
+                <span className="bg-accent-400 rounded-full px-2 py-0.5 text-xs font-bold text-neutral-900">
+                  CONFIRMADO
+                </span>
+              )}
+              {/* Delay badge */}
+              {effectiveUrgency === "overdue" && !isAwaitingConfirmation && (
+                <span className="flex items-center gap-1 rounded-full border border-red-500/40 bg-red-500/20 px-2 py-0.5 text-xs font-bold text-red-400">
+                  <AlertTriangle className="h-3 w-3" />
+                  ATRASADO {elapsedMinutes - slaTarget}min
+                </span>
+              )}
+              {effectiveUrgency === "critical" && (
+                <span className="rounded-full border border-orange-500/40 bg-orange-500/20 px-2 py-0.5 text-xs font-bold text-orange-400">
+                  URGENTE
+                </span>
+              )}
             </div>
-            {item.addons.length > 0 && (
-              <ul className="mt-1 ml-6 space-y-0.5">
-                {item.addons.map((a, i) => (
-                  <li key={i} className="text-xs text-neutral-400">
-                    + {a.quantity}× {a.addon.name}
-                  </li>
-                ))}
-              </ul>
-            )}
-            {item.notes && (
-              <p className="mt-1 ml-6 text-xs text-yellow-400 italic">⚠ {item.notes}</p>
-            )}
-          </li>
-        ))}
-      </ul>
 
-      {order.notes && (
-        <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-2">
-          <p className="text-xs text-yellow-400">
-            <strong>Obs:</strong> {order.notes}
-          </p>
+            {/* Order type + table */}
+            <div className="mt-1 flex items-center gap-2">
+              <TypeIcon className={`h-3.5 w-3.5 ${typeMeta.color}`} aria-hidden="true" />
+              <span className={`text-xs font-medium ${typeMeta.color}`}>{typeMeta.label}</span>
+              {order.tableNumber && (
+                <span className="text-xs text-neutral-400">· Mesa {order.tableNumber}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Timer */}
+          <div className="ml-2 shrink-0 text-right">
+            <OrderStatusBadge status={order.status} />
+            <div
+              className={`mt-1 flex items-center justify-end gap-1 text-xs ${
+                effectiveUrgency === "ok"
+                  ? "text-neutral-500"
+                  : effectiveUrgency === "warning"
+                    ? "text-yellow-400"
+                    : effectiveUrgency === "critical"
+                      ? "text-orange-400"
+                      : "text-red-400"
+              }`}
+            >
+              <Clock className="h-3 w-3" aria-hidden="true" />
+              <span>
+                {elapsedMinutes}min / {slaTarget}min
+              </span>
+            </div>
+          </div>
         </div>
-      )}
 
-      {/* Actions */}
-      <div className="flex gap-2">
-        {isAwaitingConfirmation ? (
-          <>
+        {/* Items */}
+        <ul className="mb-4 space-y-2" aria-label="Itens do pedido">
+          {order.items.map((item) => (
+            <li key={item.id} className="rounded-lg bg-neutral-800 p-3">
+              <div className="flex items-baseline gap-2">
+                <span className="text-accent-400 text-lg font-bold">{item.quantity}×</span>
+                <span className="font-medium">{item.product.name}</span>
+              </div>
+              {item.addons.length > 0 && (
+                <ul className="mt-1 ml-6 space-y-0.5">
+                  {item.addons.map((a, i) => (
+                    <li key={i} className="text-xs text-neutral-400">
+                      + {a.quantity}× {a.addon.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {item.notes && (
+                <p className="mt-1 ml-6 text-xs text-yellow-400 italic">⚠ {item.notes}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        {order.notes && (
+          <div className="mb-4 rounded-lg border border-yellow-500/30 bg-yellow-500/10 p-2">
+            <p className="text-xs text-yellow-400">
+              <strong>Obs:</strong> {order.notes}
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          {isAwaitingConfirmation ? (
+            <>
+              <Button
+                className="flex-1 bg-emerald-500 font-bold hover:bg-emerald-400"
+                onClick={onConfirm}
+                disabled={isPending}
+              >
+                Confirmar
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-1 border-red-500 font-bold text-red-400 hover:bg-red-500/10"
+                onClick={onCancel}
+                disabled={isPending}
+              >
+                Rejeitar
+              </Button>
+            </>
+          ) : isConfirmed ? (
+            <Button
+              className="bg-accent-500 hover:bg-accent-400 flex-1 font-bold text-neutral-900"
+              onClick={onStartPrep}
+              disabled={isPending}
+            >
+              Iniciar preparo
+            </Button>
+          ) : (
             <Button
               className="flex-1 bg-emerald-500 font-bold hover:bg-emerald-400"
-              onClick={onConfirm}
+              onClick={onReady}
               disabled={isPending}
             >
-              Confirmar
+              <CheckCheck className="mr-1 h-4 w-4" aria-hidden="true" />
+              Pronto!
             </Button>
-            <Button
-              variant="outline"
-              className="flex-1 border-red-500 font-bold text-red-400 hover:bg-red-500/10"
-              onClick={onCancel}
-              disabled={isPending}
-            >
-              Rejeitar
-            </Button>
-          </>
-        ) : isNew ? (
-          <Button
-            className="bg-accent-500 hover:bg-accent-400 flex-1 font-bold text-neutral-900"
-            onClick={onStartPrep}
-            disabled={isPending}
-          >
-            Iniciar preparo
-          </Button>
-        ) : (
-          <Button
-            className="flex-1 bg-emerald-500 font-bold hover:bg-emerald-400"
-            onClick={onReady}
-            disabled={isPending}
-          >
-            <CheckCheck className="mr-1 h-4 w-4" aria-hidden="true" />
-            Pronto!
-          </Button>
-        )}
+          )}
+        </div>
       </div>
     </article>
   );

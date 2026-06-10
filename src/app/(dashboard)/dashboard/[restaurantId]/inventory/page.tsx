@@ -2,8 +2,9 @@ import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, History } from "lucide-react";
 import { InventoryTable } from "@/features/inventory/inventory-table";
+import Link from "next/link";
 
 export const metadata: Metadata = { title: "Estoque" };
 
@@ -43,12 +44,21 @@ export default async function InventoryPage({ params }: Props) {
             {items.length} itens · {lowStock.length} com estoque baixo
           </p>
         </div>
-        <a
-          href={`/dashboard/${restaurantId}/inventory/new`}
-          className="bg-primary-500 hover:bg-primary-600 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors"
-        >
-          + Novo item
-        </a>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/dashboard/${restaurantId}/inventory/movements`}
+            className="flex items-center gap-1.5 rounded-xl border border-neutral-200 px-4 py-2 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-50"
+          >
+            <History className="h-4 w-4" aria-hidden="true" />
+            Histórico
+          </Link>
+          <a
+            href={`/dashboard/${restaurantId}/inventory/new`}
+            className="bg-primary-500 hover:bg-primary-600 rounded-xl px-4 py-2 text-sm font-semibold text-white transition-colors"
+          >
+            + Novo item
+          </a>
+        </div>
       </div>
 
       {lowStock.length > 0 && (

@@ -12,6 +12,7 @@ import {
   PaymentMethod,
   type CashRegister,
   type CashTransaction,
+  type Prisma,
 } from "@prisma/client";
 
 export interface OpenCashRegisterInput {
@@ -114,12 +115,13 @@ export class CashRegisterRepository {
   ) {
     const { limit = 30, offset = 0, startDate, endDate } = options;
 
-    const where: Record<string, unknown> = { restaurantId };
+    const where: Prisma.CashRegisterWhereInput = { restaurantId };
 
     if (startDate || endDate) {
-      where.openedAt = {};
-      if (startDate) where.openedAt.gte = startDate;
-      if (endDate) where.openedAt.lte = endDate;
+      where.openedAt = {
+        ...(startDate && { gte: startDate }),
+        ...(endDate && { lte: endDate }),
+      };
     }
 
     const [registers, total] = await Promise.all([

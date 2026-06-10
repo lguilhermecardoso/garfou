@@ -5,6 +5,7 @@ import { DigitalMenuClient } from "@/features/menu/digital-menu-client";
 
 interface Props {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ table?: string }>;
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
@@ -18,15 +19,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function DigitalMenuPage({ params }: Props) {
+export default async function DigitalMenuPage({ params, searchParams }: Props) {
   const { slug } = await params;
+  const { table } = await searchParams;
 
   const restaurant = await prisma.restaurant.findUnique({
     where: { slug, deletedAt: null },
     select: {
       id: true,
       name: true,
+      slug: true,
       logo: true,
+      banner: true,
       phone: true,
       isOpen: true,
       settings: true,
@@ -40,8 +44,10 @@ export default async function DigitalMenuPage({ params }: Props) {
       restaurantId={restaurant.id}
       restaurantName={restaurant.name}
       restaurantLogo={restaurant.logo}
+      restaurantBanner={restaurant.banner}
       restaurantPhone={restaurant.phone}
       isOpen={restaurant.isOpen}
+      tableNumber={table}
     />
   );
 }

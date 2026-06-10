@@ -1,5 +1,37 @@
 # GARFOU Progress Log
 
+## 2026-05-14
+
+### Completed (Features sem dependências externas)
+
+- **Histórico de Movimentações de Estoque**:
+  - `src/app/api/restaurants/[restaurantId]/inventory/movements/route.ts` — GET paginado, filtro por itemId, join com nome do item e usuário
+  - `src/features/inventory/inventory-movements-table.tsx` — client component, paginação "load more", badges coloridas por tipo
+  - `src/app/(dashboard)/dashboard/[restaurantId]/inventory/movements/page.tsx` — página de histórico
+  - Botão "Histórico" adicionado na página `/inventory`
+
+- **QR Code por Mesa**:
+  - `src/features/tables/table-qr-modal.tsx` — modal com `QRCodeSVG` + `QRCodeCanvas` (para download PNG), impressão via nova janela
+  - `src/features/tables/tables-settings.tsx` — prop `restaurantSlug` adicionada, botão QR por linha
+  - `src/app/(dashboard)/dashboard/[restaurantId]/settings/tables/page.tsx` — server component busca `restaurant.slug` no banco
+  - `src/app/(public)/menu/[slug]/page.tsx` — `searchParams` aceita `?table=X`, repassa como prop `tableNumber`
+  - `src/features/menu/digital-menu-client.tsx` — prop `tableNumber`, estado `tableNumberState`, mode DINE_IN locked, badge "Mesa X" no checkout, `tableNumber` no payload do pedido
+
+- **WhatsApp**:
+  - `src/features/whatsapp/whatsapp-tools.tsx` — client component: link Web, wa.me builder, 5 templates com copy-to-clipboard animado
+  - Página `/whatsapp` refatorada — de iframe impossível para `WhatsAppTools` funcional
+  - `src/features/orders/order-detail-modal.tsx` — botão WhatsApp com link wa.me personalizado (substituir nome/número)
+
+- **Relatórios com Gráficos (recharts)**:
+  - `src/features/reports/revenue-chart.tsx` — AreaChart responsivo, tooltip customizado, gradiente verde
+  - `src/features/reports/orders-chart.tsx` — BarChart responsivo, tooltip customizado, barras roxas
+  - Reports page — `searchParams.period`, fetch de `periodOrders`, agregação em memória por dia (prefilled com zeros), dois gráficos renderizados, seletor 7d/30d/3m via Next.js Link
+
+- **Exportação CSV**:
+  - `src/app/api/restaurants/[restaurantId]/reports/export/route.ts` — GET protegido (MANAGER+), CSV com BOM UTF-8, tipo orders ou finance, range de datas, validação de range máx 1 ano
+  - `src/features/reports/export-csv-button.tsx` — client component que calcula datas do período e abre URL de download
+  - Reports page — 2 botões de export (pedidos + financeiro) integrados ao layout
+
 ## 2026-05-12
 
 ### Completed (Latest Session)

@@ -16,15 +16,29 @@ export default async function DeliveryPage({ params }: Props) {
 
   const { restaurantId } = await params;
 
-  const zones = await prisma.deliveryZone.findMany({
-    where: { restaurantId },
-    orderBy: { name: "asc" },
-  });
+  const [zones, restaurant] = await Promise.all([
+    prisma.deliveryZone.findMany({
+      where: { restaurantId },
+      orderBy: { name: "asc" },
+    }),
+    prisma.restaurant.findUnique({
+      where: { id: restaurantId },
+      select: { settings: true },
+    }),
+  ]);
 
   const initialZones = zones.map((zone) => ({
     ...zone,
     fee: Number(zone.fee),
   }));
+
+  const settings = (restaurant?.settings ?? {}) as Record<string, unknown>;
+  const initialFlatFee =
+    typeof settings.defaultDeliveryFee === "number" ? settings.defaultDeliveryFee : undefined;
+  const initialFlatMinutes =
+    typeof settings.defaultDeliveryMinutes === "number"
+      ? settings.defaultDeliveryMinutes
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -37,7 +51,12 @@ export default async function DeliveryPage({ params }: Props) {
         </div>
       </div>
 
-      <DeliveryZonesClient restaurantId={restaurantId} initialZones={initialZones} />
+      <DeliveryZonesClient
+        restaurantId={restaurantId}
+        initialZones={initialZones}
+        initialFlatFee={initialFlatFee}
+        initialFlatMinutes={initialFlatMinutes}
+      />
     </div>
   );
 }

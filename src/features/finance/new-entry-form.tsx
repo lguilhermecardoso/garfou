@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { CurrencyInput, parseCurrencyToNumber } from "@/components/ui/masked-input";
 
 interface Props {
   restaurantId: string;
@@ -16,7 +17,9 @@ export function NewFinanceEntryForm({ restaurantId }: Props) {
   const [amount, setAmount] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
   const [type, setType] = useState<"REVENUE" | "EXPENSE">("REVENUE");
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "PIX" | "CREDIT_CARD" | "DEBIT_CARD">("PIX");
+  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "PIX" | "CREDIT_CARD" | "DEBIT_CARD">(
+    "PIX"
+  );
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +35,7 @@ export function NewFinanceEntryForm({ restaurantId }: Props) {
         body: JSON.stringify({
           description,
           category,
-          amount: Number(amount),
+          amount: parseCurrencyToNumber(amount),
           date,
           type,
           paymentMethod,
@@ -58,7 +61,9 @@ export function NewFinanceEntryForm({ restaurantId }: Props) {
     <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label htmlFor="type" className="text-sm font-medium text-neutral-700">Tipo</label>
+          <label htmlFor="type" className="text-sm font-medium text-neutral-700">
+            Tipo
+          </label>
           <select
             id="type"
             className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm"
@@ -97,25 +102,25 @@ export function NewFinanceEntryForm({ restaurantId }: Props) {
           placeholder="Ex.: Vendas, Operacional"
         />
 
-        <Input
+        <CurrencyInput
           id="amount"
-          type="number"
-          step="0.01"
-          min="0"
           label="Valor"
           required
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          placeholder="0.00"
         />
 
         <div className="space-y-1.5">
-          <label htmlFor="paymentMethod" className="text-sm font-medium text-neutral-700">Forma de pagamento</label>
+          <label htmlFor="paymentMethod" className="text-sm font-medium text-neutral-700">
+            Forma de pagamento
+          </label>
           <select
             id="paymentMethod"
             className="h-10 w-full rounded-lg border border-neutral-300 bg-white px-3 text-sm"
             value={paymentMethod}
-            onChange={(e) => setPaymentMethod(e.target.value as "CASH" | "PIX" | "CREDIT_CARD" | "DEBIT_CARD")}
+            onChange={(e) =>
+              setPaymentMethod(e.target.value as "CASH" | "PIX" | "CREDIT_CARD" | "DEBIT_CARD")
+            }
           >
             <option value="PIX">PIX</option>
             <option value="CASH">Dinheiro</option>
@@ -128,10 +133,16 @@ export function NewFinanceEntryForm({ restaurantId }: Props) {
       {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
       <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="ghost" onClick={() => router.push(`/dashboard/${restaurantId}/finance`)}>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => router.push(`/dashboard/${restaurantId}/finance`)}
+        >
           Cancelar
         </Button>
-        <Button type="submit" loading={loading}>Salvar lançamento</Button>
+        <Button type="submit" loading={loading}>
+          Salvar lançamento
+        </Button>
       </div>
     </form>
   );
