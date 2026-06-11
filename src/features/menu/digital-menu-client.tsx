@@ -23,8 +23,6 @@ import {
   MapPin,
   Copy,
   Check,
-  Clock,
-  Wifi,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ProductDetailSheet } from "@/features/menu/product-detail-sheet";
@@ -87,44 +85,6 @@ export function DigitalMenuClient({
   const [tableNumberState] = useState<string>(tableNumber ?? "");
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
-  const [isPaidOnline, setIsPaidOnline] = useState(false);
-
-  // Online PIX payment state
-  type PaymentMode = "on_delivery" | "pix_online" | "card_online";
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>("on_delivery");
-  type PixStep = null | {
-    pixQrCodeUrl: string | null;
-    pixCopyPaste: string | null;
-    expiresAt: string | null;
-    orderNumber: number;
-    orderId: string;
-    total: number;
-  };
-  const [pixStep, setPixStep] = useState<PixStep>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [pixPolling, setPixPolling] = useState<ReturnType<typeof setInterval> | null>(null);
-  const [isRedirectingToStripe, setIsRedirectingToStripe] = useState(false);
-
-  // Handle Stripe redirect back (success or cancelled)
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const payment = params.get("payment");
-    const orderId = params.get("orderId");
-    if (payment === "success" && orderId) {
-      /* eslint-disable react-hooks/set-state-in-effect */
-      setPlacedOrderId(orderId);
-      setIsPaidOnline(true);
-      setOrderPlaced(true);
-      /* eslint-enable react-hooks/set-state-in-effect */
-      // Clean URL
-      window.history.replaceState({}, "", window.location.pathname);
-    } else if (payment === "cancelled") {
-      toast.error("Pagamento cancelado. Tente novamente.");
-      window.history.replaceState({}, "", window.location.pathname);
-    }
-  }, []);
 
   // Delivery address fields
   const [deliveryCEP, setDeliveryCEP] = useState("");
@@ -281,16 +241,6 @@ export function DigitalMenuClient({
       return;
     }
 
-    if (paymentMode === "pix_online") {
-      await placeOrderWithPix();
-      return;
-    }
-
-    if (paymentMode === "card_online") {
-      await placeOrderWithCard();
-      return;
-    }
-
     // Validate customer info
     if (!customerName.trim()) {
       toast.error("Por favor, informe seu nome");
@@ -378,304 +328,14 @@ export function DigitalMenuClient({
     }
   }
 
-  async function placeOrderWithPix() {
-    if (!customerName.trim()) {
-      toast.error("Por favor, informe seu nome");
-      return;
-    }
-    if (!customerPhone.trim()) {
-      toast.error("Por favor, informe seu WhatsApp");
-      return;
-    }
-    if (
-      orderType === "DELIVERY" &&
-      (!deliveryStreet.trim() ||
-        !deliveryNumber.trim() ||
-        !deliveryNeighborhood.trim() ||
-        !deliveryCity.trim())
-    ) {
-      toast.error("Por favor, preencha o endereço completo");
-      return;
-    }
-
-    try {
-      const res = await fetch(`/api/restaurants/${restaurantId}/payment-intent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: orderType,
-          paymentMethod: "PIX",
-          tableNumber: tableNumberState || undefined,
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerEmail: customerEmail.trim() || undefined,
-          deliveryFee: orderType === "DELIVERY" ? deliveryFee : undefined,
-          deliveryAddress:
-            orderType === "DELIVERY"
-              ? {
-                  street: deliveryStreet.trim(),
-                  number: deliveryNumber.trim(),
-                  complement: deliveryComplement.trim() || undefined,
-                  neighborhood: deliveryNeighborhood.trim(),
-                  city: deliveryCity.trim(),
-                  state: deliveryState.trim(),
-                  zipCode: deliveryCEP.trim(),
-                }
-              : undefined,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selectedOptions: item.selectedOptions.map((option) => ({
-              optionId: option.optionId,
-              quantity: option.quantity,
-              isRemoval: option.isRemoval,
-            })),
-            splits: item.splits.map((split) => ({
-              splitIndex: split.splitIndex,
-              flavorProductId: split.flavorProductId,
-            })),
-            addons: [],
-          })),
-        }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setIsCartOpen(false);
-        setPixStep({
-          orderId: data.data.orderId,
-          orderNumber: data.data.orderNumber,
-          total: data.data.total,
-          pixQrCodeUrl: data.data.pixQrCodeUrl,
-          pixCopyPaste: data.data.pixCopyPaste,
-          expiresAt: data.data.expiresAt,
-        });
-        // Poll for payment confirmation every 5 seconds
-        const intervalId = setInterval(async () => {
-          try {
-            const statusRes = await fetch(
-              `/api/restaurants/${restaurantId}/orders/${data.data.orderId}`
-            );
-            const statusData = await statusRes.json();
-            if (statusData.data?.paymentStatus === "PAID") {
-              clearInterval(intervalId);
-              setPixPolling(null);
-              setPixStep(null);
-              setCart([]);
-              setPlacedOrderId(data.data.orderId);
-              setOrderPlaced(true);
-              toast.success("Pagamento confirmado! Pedido realizado.");
-            }
-          } catch {
-            // ignore polling errors
-          }
-        }, 5000);
-        setPixPolling(intervalId);
-      } else {
-        toast.error(data.error ?? "Erro ao gerar PIX.");
-      }
-    } catch {
-      toast.error("Erro ao gerar PIX. Tente novamente.");
-    }
-  }
-
-  function cancelPixPayment() {
-    if (pixPolling) clearInterval(pixPolling);
-    setPixPolling(null);
-    setPixStep(null);
-    setIsCartOpen(true);
-  }
-
-  async function placeOrderWithCard() {
-    if (!customerName.trim()) {
-      toast.error("Por favor, informe seu nome");
-      return;
-    }
-    if (!customerPhone.trim()) {
-      toast.error("Por favor, informe seu WhatsApp");
-      return;
-    }
-    if (
-      orderType === "DELIVERY" &&
-      (!deliveryStreet.trim() ||
-        !deliveryNumber.trim() ||
-        !deliveryNeighborhood.trim() ||
-        !deliveryCity.trim())
-    ) {
-      toast.error("Por favor, preencha o endereço completo");
-      return;
-    }
-
-    setIsRedirectingToStripe(true);
-    try {
-      const res = await fetch(`/api/restaurants/${restaurantId}/checkout-session`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          origin: window.location.origin,
-          type: orderType,
-          paymentMethod: "CREDIT_CARD",
-          tableNumber: tableNumberState || undefined,
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerEmail: customerEmail.trim() || undefined,
-          deliveryFee: orderType === "DELIVERY" ? deliveryFee : undefined,
-          deliveryAddress:
-            orderType === "DELIVERY"
-              ? {
-                  street: deliveryStreet.trim(),
-                  number: deliveryNumber.trim(),
-                  complement: deliveryComplement.trim() || undefined,
-                  neighborhood: deliveryNeighborhood.trim(),
-                  city: deliveryCity.trim(),
-                  state: deliveryState.trim(),
-                  zipCode: deliveryCEP.trim(),
-                }
-              : undefined,
-          items: cart.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            notes: item.notes,
-            selectedOptions: item.selectedOptions.map((o) => ({
-              optionId: o.optionId,
-              quantity: o.quantity,
-              isRemoval: o.isRemoval,
-            })),
-            splits: item.splits.map((s) => ({
-              splitIndex: s.splitIndex,
-              flavorProductId: s.flavorProductId,
-            })),
-            addons: [],
-          })),
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok && data.data?.sessionUrl) {
-        window.location.href = data.data.sessionUrl;
-      } else {
-        toast.error(data.error ?? "Erro ao iniciar pagamento.");
-        setIsRedirectingToStripe(false);
-      }
-    } catch {
-      toast.error("Erro ao iniciar pagamento. Tente novamente.");
-      setIsRedirectingToStripe(false);
-    }
-  }
-
-  async function copyPixCode() {
-    if (!pixStep?.pixCopyPaste) return;
-    await navigator.clipboard.writeText(pixStep.pixCopyPaste);
-    setPixCopied(true);
-    setTimeout(() => setPixCopied(false), 2500);
-  }
-
-  // PIX payment screen
-  if (pixStep) {
-    return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-5 bg-neutral-50 px-4 py-10">
-        <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-lg">
-          {/* Header */}
-          <div className="bg-emerald-500 px-5 py-4 text-white">
-            <div className="mb-1 flex items-center gap-2">
-              <QrCode className="h-5 w-5" aria-hidden="true" />
-              <span className="text-lg font-bold">Pague com PIX</span>
-            </div>
-            <p className="text-sm text-emerald-100">
-              Pedido #{pixStep.orderNumber} · {formatCurrency(Number(pixStep.total))}
-            </p>
-          </div>
-
-          <div className="space-y-4 p-5">
-            {/* QR Code */}
-            {pixStep.pixQrCodeUrl ? (
-              <div className="flex flex-col items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={pixStep.pixQrCodeUrl}
-                  alt="QR Code PIX"
-                  className="h-48 w-48 rounded-xl border border-neutral-100"
-                />
-                <p className="text-center text-xs text-neutral-500">
-                  Abra seu banco e escaneie o QR Code
-                </p>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-2 py-4">
-                <QrCode className="h-12 w-12 text-neutral-300" aria-hidden="true" />
-                <p className="text-sm text-neutral-500">QR Code não disponível</p>
-              </div>
-            )}
-
-            {/* Copia e cola */}
-            {pixStep.pixCopyPaste && (
-              <div className="space-y-1.5">
-                <p className="text-xs font-semibold text-neutral-500">Ou copie o código PIX:</p>
-                <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-3 py-2">
-                  <p className="flex-1 truncate font-mono text-xs text-neutral-700">
-                    {pixStep.pixCopyPaste.slice(0, 40)}…
-                  </p>
-                  <button
-                    onClick={copyPixCode}
-                    className={`flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-colors ${pixCopied ? "bg-emerald-100 text-emerald-700" : "bg-neutral-200 text-neutral-700"}`}
-                    aria-label="Copiar código PIX"
-                  >
-                    {pixCopied ? (
-                      <>
-                        <Check className="h-3.5 w-3.5" aria-hidden="true" /> Copiado!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="h-3.5 w-3.5" aria-hidden="true" /> Copiar
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Expiry info */}
-            <div className="flex items-center gap-2 rounded-xl border border-amber-100 bg-amber-50 px-3 py-2.5">
-              <Clock className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
-              <p className="text-xs text-amber-700">
-                Este código expira em <span className="font-semibold">1 hora</span>. Após pagar, seu
-                pedido é confirmado automaticamente.
-              </p>
-            </div>
-
-            {/* Polling indicator */}
-            <div className="flex items-center gap-2 rounded-xl border border-blue-100 bg-blue-50 px-3 py-2.5">
-              <Wifi className="h-4 w-4 shrink-0 text-blue-500" aria-hidden="true" />
-              <p className="text-xs text-blue-700">Aguardando confirmação do pagamento…</p>
-            </div>
-          </div>
-
-          {/* Cancel */}
-          <div className="border-t border-neutral-100 px-5 py-4">
-            <button
-              onClick={cancelPixPayment}
-              className="w-full text-sm text-neutral-500 underline underline-offset-2"
-            >
-              Cancelar e voltar ao carrinho
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (orderPlaced) {
     const waLink = restaurantPhone
       ? `https://wa.me/55${restaurantPhone.replace(/\D/g, "")}?text=${encodeURIComponent(`Olá! Acabei de fazer um pedido no cardápio digital${placedOrderId ? ` (#${placedOrderId})` : ""}.`)}`
       : null;
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-neutral-50 px-4 text-center">
-        <div className={`rounded-full p-6 ${isPaidOnline ? "bg-blue-100" : "bg-emerald-100"}`}>
-          {isPaidOnline ? (
-            <CreditCard className="h-12 w-12 text-blue-500" aria-hidden="true" />
-          ) : (
-            <UtensilsCrossed className="h-12 w-12 text-emerald-500" aria-hidden="true" />
-          )}
+        <div className="rounded-full bg-emerald-100 p-6">
+          <UtensilsCrossed className="h-12 w-12 text-emerald-500" aria-hidden="true" />
         </div>
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Pedido realizado!</h1>
@@ -684,20 +344,7 @@ export function DigitalMenuClient({
           </p>
         </div>
 
-        {isPaidOnline && (
-          <div className="w-full max-w-sm rounded-2xl border border-blue-200 bg-blue-50 p-5 text-left">
-            <div className="mb-2 flex items-center gap-2">
-              <CreditCard className="h-5 w-5 text-blue-600" aria-hidden="true" />
-              <span className="font-semibold text-blue-800">Pagamento confirmado!</span>
-            </div>
-            <p className="text-sm text-blue-700">
-              Seu pagamento com cartão foi processado com sucesso pelo Stripe. O restaurante já
-              recebeu a confirmação.
-            </p>
-          </div>
-        )}
-
-        {!isPaidOnline && paymentMethod === "PIX" && (
+        {paymentMethod === "PIX" && (
           <div className="w-full max-w-sm rounded-2xl border border-emerald-200 bg-emerald-50 p-5 text-left">
             <div className="mb-2 flex items-center gap-2">
               <QrCode className="h-5 w-5 text-emerald-600" aria-hidden="true" />
@@ -723,7 +370,6 @@ export function DigitalMenuClient({
           onClick={() => {
             setOrderPlaced(false);
             setPlacedOrderId(null);
-            setIsPaidOnline(false);
           }}
         >
           Fazer novo pedido
@@ -1321,52 +967,27 @@ export function DigitalMenuClient({
                 )}
 
                 <div className="border-t border-neutral-100 pt-2">
-                  <p className="mb-2 text-xs font-semibold text-neutral-500">Como vai pagar?</p>
+                  <p className="mb-2 text-xs font-semibold text-neutral-500">Forma de pagamento</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setPaymentMode("on_delivery")}
-                      className={`flex flex-col items-center gap-1 rounded-xl border py-3 text-xs font-medium transition-colors ${paymentMode === "on_delivery" ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
-                    >
-                      <Banknote className="h-4 w-4" aria-hidden="true" />
-                      Na entrega / retirada
-                    </button>
-                    <button
-                      onClick={() => setPaymentMode("card_online")}
-                      className={`flex flex-col items-center gap-1 rounded-xl border py-3 text-xs font-medium transition-colors ${paymentMode === "card_online" ? "border-blue-500 bg-blue-50 text-blue-700" : "border-neutral-200 text-neutral-600"}`}
-                    >
-                      <CreditCard className="h-4 w-4" aria-hidden="true" />
-                      Cartão online (Stripe)
-                    </button>
+                    {(
+                      [
+                        { value: "PIX", label: "PIX", Icon: QrCode },
+                        { value: "CASH", label: "Dinheiro", Icon: Banknote },
+                        { value: "CREDIT_CARD", label: "Cartão crédito", Icon: CreditCard },
+                        { value: "DEBIT_CARD", label: "Cartão débito", Icon: CreditCard },
+                      ] as const
+                    ).map(({ value, label, Icon }) => (
+                      <button
+                        key={value}
+                        onClick={() => setPaymentMethod(value)}
+                        className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${paymentMethod === value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
+                      >
+                        <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+                        {label}
+                      </button>
+                    ))}
                   </div>
                 </div>
-
-                {/* Payment method selector — only when paying on delivery */}
-                {paymentMode === "on_delivery" && (
-                  <div className="border-t border-neutral-100 pt-2">
-                    <p className="mb-2 text-xs font-semibold text-neutral-500">
-                      Forma de pagamento
-                    </p>
-                    <div className="grid grid-cols-2 gap-2">
-                      {(
-                        [
-                          { value: "PIX", label: "PIX", Icon: QrCode },
-                          { value: "CASH", label: "Dinheiro", Icon: Banknote },
-                          { value: "CREDIT_CARD", label: "Cartão crédito", Icon: CreditCard },
-                          { value: "DEBIT_CARD", label: "Cartão débito", Icon: CreditCard },
-                        ] as const
-                      ).map(({ value, label, Icon }) => (
-                        <button
-                          key={value}
-                          onClick={() => setPaymentMethod(value)}
-                          className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors ${paymentMethod === value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
-                        >
-                          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
               </div>
               <div className="border-t border-neutral-100 px-4 py-4">
                 <div className="mb-2 space-y-1">
@@ -1395,23 +1016,9 @@ export function DigitalMenuClient({
                   className="w-full"
                   size="lg"
                   onClick={placeOrder}
-                  disabled={cart.length === 0 || isRedirectingToStripe || !isOpen}
+                  disabled={cart.length === 0 || !isOpen}
                 >
-                  {isRedirectingToStripe ? (
-                    <span className="flex items-center gap-2">
-                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-                      Aguarde…
-                    </span>
-                  ) : !isOpen ? (
-                    "Loja fechada"
-                  ) : paymentMode === "card_online" ? (
-                    <span className="flex items-center gap-2">
-                      <CreditCard className="h-4 w-4" aria-hidden="true" />
-                      Pagar com cartão
-                    </span>
-                  ) : (
-                    "Confirmar pedido"
-                  )}
+                  {!isOpen ? "Loja fechada" : "Confirmar pedido"}
                 </Button>
               </div>
             </div>
