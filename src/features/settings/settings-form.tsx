@@ -39,6 +39,7 @@ export function SettingsForm({ restaurantId }: Props) {
     logo: null as string | null,
     banner: null as string | null,
     isOpen: false,
+    isDeliveryOnly: false,
   });
 
   const { data: restaurant, isLoading } = useQuery<Restaurant>({
@@ -61,16 +62,21 @@ export function SettingsForm({ restaurantId }: Props) {
         logo: restaurant.logo,
         banner: restaurant.banner,
         isOpen: restaurant.isOpen,
+        isDeliveryOnly: (restaurant.settings?.isDeliveryOnly as boolean) ?? false,
       });
     }
   }, [restaurant]);
 
   const update = useMutation({
     mutationFn: async (data: typeof form) => {
+      const { isDeliveryOnly, ...rest } = data;
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
+        body: JSON.stringify({
+          ...rest,
+          settings: { ...(restaurant?.settings ?? {}), isDeliveryOnly },
+        }),
       });
       if (!res.ok) throw new Error("Erro ao salvar");
       return res.json();
@@ -188,6 +194,29 @@ export function SettingsForm({ restaurantId }: Props) {
             {typeof window !== "undefined" ? window.location.origin : ""}/menu/{restaurant?.slug}
           </code>
         </div>
+        <label className="flex cursor-pointer items-center gap-3">
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={form.isDeliveryOnly}
+              onChange={(e) => setForm((p) => ({ ...p, isDeliveryOnly: e.target.checked }))}
+              className="sr-only"
+            />
+            <div
+              className={`h-6 w-11 rounded-full transition-colors ${form.isDeliveryOnly ? "bg-primary-500" : "bg-neutral-300"}`}
+            >
+              <div
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.isDeliveryOnly ? "translate-x-5" : "translate-x-0.5"}`}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="font-medium text-neutral-900">Somente delivery</p>
+            <p className="text-sm text-neutral-400">
+              Remove a opção &quot;Comer aqui&quot; do cardápio digital
+            </p>
+          </div>
+        </label>
       </div>
 
       {/* Status */}

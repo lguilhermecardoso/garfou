@@ -46,6 +46,8 @@ interface Props {
   restaurantCity?: string | null;
   restaurantState?: string | null;
   isOpen: boolean;
+  /** Remove DINE_IN option — delivery/takeout only restaurant */
+  isDeliveryOnly?: boolean;
   /** Pre-filled table number from ?table= URL param (QR code per mesa) */
   tableNumber?: string;
 }
@@ -69,6 +71,7 @@ export function DigitalMenuClient({
   restaurantCity,
   restaurantState,
   isOpen,
+  isDeliveryOnly = false,
   tableNumber,
 }: Props) {
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -80,8 +83,10 @@ export function DigitalMenuClient({
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerEmail, setCustomerEmail] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("PIX");
-  // When coming from a QR code (?table=X), lock to DINE_IN
-  const [orderType, setOrderType] = useState<"DINE_IN" | "DELIVERY" | "TAKEOUT">("DINE_IN");
+  // QR code forces DINE_IN; delivery-only restaurants default to DELIVERY
+  const [orderType, setOrderType] = useState<"DINE_IN" | "DELIVERY" | "TAKEOUT">(
+    tableNumber ? "DINE_IN" : isDeliveryOnly ? "DELIVERY" : "DINE_IN"
+  );
   const [tableNumberState] = useState<string>(tableNumber ?? "");
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [placedOrderId, setPlacedOrderId] = useState<string | null>(null);
@@ -852,22 +857,24 @@ export function DigitalMenuClient({
                       </span>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className={`grid gap-2 ${isDeliveryOnly ? "grid-cols-2" : "grid-cols-3"}`}>
                       {(
                         [
                           { value: "DINE_IN", label: "Comer aqui" },
                           { value: "TAKEOUT", label: "Retirar" },
                           { value: "DELIVERY", label: "Entrega" },
                         ] as const
-                      ).map((option) => (
-                        <button
-                          key={option.value}
-                          onClick={() => setOrderType(option.value)}
-                          className={`rounded-lg border py-2 text-xs font-medium transition-colors ${orderType === option.value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
-                        >
-                          {option.label}
-                        </button>
-                      ))}
+                      )
+                        .filter((o) => !(isDeliveryOnly && o.value === "DINE_IN"))
+                        .map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setOrderType(option.value)}
+                            className={`rounded-lg border py-2 text-xs font-medium transition-colors ${orderType === option.value ? "border-primary-500 bg-primary-50 text-primary-700" : "border-neutral-200 text-neutral-600"}`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
                     </div>
                   )}
                 </div>

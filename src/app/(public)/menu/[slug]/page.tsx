@@ -53,6 +53,7 @@ export default async function DigitalMenuPage({ params, searchParams }: Props) {
       restaurantCity={restaurant.city}
       restaurantState={restaurant.state}
       isOpen={restaurant.isOpen}
+      isDeliveryOnly={(restaurant.settings as Record<string, unknown>)?.isDeliveryOnly === true}
       tableNumber={table}
     />
   );
