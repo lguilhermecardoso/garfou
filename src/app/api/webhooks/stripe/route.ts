@@ -44,10 +44,16 @@ export async function POST(req: Request) {
       // Card payment for an order (Checkout Session one-time payment)
       if (session.mode === "payment" && session.metadata?.orderId) {
         const orderId = session.metadata.orderId;
-        await prisma.order.updateMany({
-          where: { id: orderId, paymentStatus: "PENDING" },
-          data: { paymentStatus: "PAID", paymentMethod: "CREDIT_CARD" },
-        });
+        await prisma.$transaction([
+          prisma.order.updateMany({
+            where: { id: orderId, paymentStatus: "PENDING" },
+            data: { paymentStatus: "PAID", paymentMethod: "CREDIT_CARD" },
+          }),
+          prisma.platformFee.updateMany({
+            where: { orderId, collectedAt: null },
+            data: { collectedAt: new Date() },
+          }),
+        ]);
       }
       break;
     }
@@ -124,16 +130,16 @@ export async function POST(req: Request) {
       const orderId = intent.metadata?.orderId;
 
       if (orderId) {
-        await prisma.order.updateMany({
-          where: {
-            id: orderId,
-            stripePaymentIntentId: intent.id,
-          },
-          data: {
-            paymentStatus: "PAID",
-            paymentMethod: "PIX",
-          },
-        });
+        await prisma.$transaction([
+          prisma.order.updateMany({
+            where: { id: orderId, stripePaymentIntentId: intent.id },
+            data: { paymentStatus: "PAID", paymentMethod: "PIX" },
+          }),
+          prisma.platformFee.updateMany({
+            where: { orderId, collectedAt: null },
+            data: { collectedAt: new Date() },
+          }),
+        ]);
       }
       break;
     }

@@ -38,7 +38,14 @@ export const {
 
           const user = await prisma.user.findUnique({
             where: { email },
-            select: { id: true, name: true, email: true, image: true, passwordHash: true },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              image: true,
+              passwordHash: true,
+              isAdmin: true,
+            },
           });
 
           if (!user || !user.passwordHash) {
@@ -53,7 +60,13 @@ export const {
           }
 
           console.log("[auth] login successful for:", email, "id:", user.id);
-          return { id: user.id, name: user.name, email: user.email, image: user.image };
+          return {
+            id: user.id,
+            name: user.name,
+            email: user.email,
+            image: user.image,
+            isAdmin: user.isAdmin,
+          };
         } catch (err) {
           console.error("[auth] authorize exception:", err);
           return null;

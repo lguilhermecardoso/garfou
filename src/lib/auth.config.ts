@@ -54,12 +54,16 @@ export const authConfig: NextAuthConfig = {
       return true;
     },
     async jwt({ token, user }) {
-      if (user) token.id = user.id;
+      if (user) {
+        token.id = user.id;
+        token.isAdmin = user.isAdmin ?? false;
+      }
       return token;
     },
     async session({ session, token }) {
-      if (token?.id && session.user) {
-        session.user.id = token.id as string;
+      if (session.user) {
+        if (token?.id) session.user.id = token.id as string;
+        session.user.isAdmin = (token?.isAdmin as boolean) ?? false;
       }
       return session;
     },

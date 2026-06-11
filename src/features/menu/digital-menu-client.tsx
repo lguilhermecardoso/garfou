@@ -1136,6 +1136,11 @@ export function DigitalMenuClient({
                   <p className="mb-1.5 text-[10px] font-semibold tracking-wide text-emerald-600 uppercase">
                     Pagar agora online
                   </p>
+                  {(paymentMethod === "PIX_ONLINE" || paymentMethod === "CREDIT_CARD_ONLINE") && (
+                    <div className="mb-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                      + R$ 1,00 taxa de serviço online incluída no total
+                    </div>
+                  )}
                   <div className="mb-3 grid grid-cols-2 gap-2">
                     {(
                       [
@@ -1253,11 +1258,22 @@ export function DigitalMenuClient({
                         </span>
                       </div>
                     )}
+                    {(paymentMethod === "PIX_ONLINE" || paymentMethod === "CREDIT_CARD_ONLINE") && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-neutral-600">Taxa de serviço online</span>
+                        <span className="font-medium text-neutral-900">{formatCurrency(1)}</span>
+                      </div>
+                    )}
                   </div>
                   <div className="mb-4 flex items-center justify-between border-t border-neutral-100 pt-2">
                     <span className="font-semibold text-neutral-700">Total</span>
                     <span className="text-xl font-bold text-neutral-900">
-                      {formatCurrency(finalTotal)}
+                      {formatCurrency(
+                        finalTotal +
+                          (paymentMethod === "PIX_ONLINE" || paymentMethod === "CREDIT_CARD_ONLINE"
+                            ? 1
+                            : 0)
+                      )}
                     </span>
                   </div>
                   <Button

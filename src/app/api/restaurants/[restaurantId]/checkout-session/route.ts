@@ -75,9 +75,10 @@ export async function POST(req: NextRequest, { params }: Params) {
       undefined
     );
 
-    const amountInCents = Math.round(Number(order.total) * 100);
+    const PLATFORM_FEE_CENTS = 100; // R$ 1,00
+    const orderAmountCents = Math.round(Number(order.total) * 100);
 
-    if (amountInCents < 100) {
+    if (orderAmountCents < 100) {
       await prisma.order.delete({ where: { id: order.id } });
       return NextResponse.json(
         { error: "Valor mínimo para pagamento online é R$ 1,00." },
@@ -102,7 +103,15 @@ export async function POST(req: NextRequest, { params }: Params) {
               name: `Pedido #${order.orderNumber}`,
               description: `${restaurant.name} — ${order.items?.length ?? 1} ${order.items?.length === 1 ? "item" : "itens"}`,
             },
-            unit_amount: amountInCents,
+            unit_amount: orderAmountCents,
+          },
+          quantity: 1,
+        },
+        {
+          price_data: {
+            currency: "brl",
+            product_data: { name: "Taxa de serviço online" },
+            unit_amount: PLATFORM_FEE_CENTS,
           },
           quantity: 1,
         },
@@ -117,18 +126,29 @@ export async function POST(req: NextRequest, { params }: Params) {
       customer_email: parsed.data.customerEmail || undefined,
     });
 
-    // Save stripePaymentIntentId on the order so the webhook can match it
-    if (session.payment_intent) {
-      await prisma.order.update({
+    // Save stripePaymentIntentId on the order + create platform fee record
+    const stripePaymentIntentId =
+      session.payment_intent == null
+        ? null
+        : typeof session.payment_intent === "string"
+          ? session.payment_intent
+          : session.payment_intent.id;
+
+    await prisma.$transaction([
+      prisma.order.update({
         where: { id: order.id },
+        data: { stripePaymentIntentId: stripePaymentIntentId ?? undefined },
+      }),
+      prisma.platformFee.create({
         data: {
-          stripePaymentIntentId:
-            typeof session.payment_intent === "string"
-              ? session.payment_intent
-              : session.payment_intent.id,
+          orderId: order.id,
+          restaurantId,
+          amount: 1.0,
+          paymentMethod: "CREDIT_CARD",
+          stripePaymentIntentId: stripePaymentIntentId,
         },
-      });
-    }
+      }),
+    ]);
 
     return NextResponse.json(
       {

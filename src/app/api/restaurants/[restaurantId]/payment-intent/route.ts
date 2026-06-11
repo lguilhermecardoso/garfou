@@ -69,11 +69,12 @@ export async function POST(req: NextRequest, { params }: Params) {
     // Create the order with PENDING payment status
     const order = await orderService.createOrder(restaurantId, parsed.data, undefined);
 
-    // Calculate amount in centavos (Stripe requires integer)
-    const amountInCents = Math.round(Number(order.total) * 100);
+    // Calculate amount in centavos — add R$1 platform service fee
+    const PLATFORM_FEE_CENTS = 100; // R$ 1,00
+    const orderAmountCents = Math.round(Number(order.total) * 100);
+    const amountInCents = orderAmountCents + PLATFORM_FEE_CENTS;
 
-    if (amountInCents < 100) {
-      // Clean up the order we just created
+    if (orderAmountCents < 100) {
       await prisma.order.delete({ where: { id: order.id } });
       return NextResponse.json(
         { error: "Valor mínimo para pagamento online é R$ 1,00." },
@@ -102,11 +103,22 @@ export async function POST(req: NextRequest, { params }: Params) {
       },
     });
 
-    // Save the paymentIntentId on the order
-    await prisma.order.update({
-      where: { id: order.id },
-      data: { stripePaymentIntentId: paymentIntent.id },
-    });
+    // Save the paymentIntentId on the order + create platform fee record
+    await prisma.$transaction([
+      prisma.order.update({
+        where: { id: order.id },
+        data: { stripePaymentIntentId: paymentIntent.id },
+      }),
+      prisma.platformFee.create({
+        data: {
+          orderId: order.id,
+          restaurantId,
+          amount: 1.0,
+          paymentMethod: "PIX",
+          stripePaymentIntentId: paymentIntent.id,
+        },
+      }),
+    ]);
 
     const pixAction = paymentIntent.next_action?.pix_display_qr_code;
 
@@ -116,10 +128,9 @@ export async function POST(req: NextRequest, { params }: Params) {
           orderId: order.id,
           orderNumber: order.orderNumber,
           total: order.total,
+          platformFee: 1.0,
           paymentIntentId: paymentIntent.id,
-          // QR Code image (SVG URL hosted by Stripe)
           pixQrCodeUrl: pixAction?.image_url_svg ?? pixAction?.image_url_png ?? null,
-          // Copia-e-cola PIX code
           pixCopyPaste: pixAction?.data ?? null,
           expiresAt: paymentIntent.payment_method_options?.pix?.expires_after_seconds
             ? new Date(Date.now() + 3600 * 1000).toISOString()
