@@ -209,7 +209,7 @@ export default async function ReportsPage({ params, searchParams }: Props) {
         {[
           {
             label: "Faturamento (mês)",
-            value: formatCurrency(Math.round(thisRevenue * 100)),
+            value: formatCurrency(thisRevenue),
             sub: `${revenueGrowth >= 0 ? "+" : ""}${revenueGrowth.toFixed(1)}% vs mês anterior`,
             positive: revenueGrowth >= 0,
             icon: TrendingUp,
@@ -227,7 +227,7 @@ export default async function ReportsPage({ params, searchParams }: Props) {
           },
           {
             label: "Ticket médio",
-            value: formatCurrency(Math.round(ticketAvg * 100)),
+            value: formatCurrency(ticketAvg),
             sub: "por pedido finalizado",
             positive: true,
             icon: BarChart3,

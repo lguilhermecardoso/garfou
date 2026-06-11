@@ -278,12 +278,14 @@ export function printOrder(order: PrintOrder): void {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 8.5pt;
-    line-height: 1.3;
+    font-size: 9.5pt;
+    font-weight: 500;
+    line-height: 1.4;
     color: #000;
     background: #fff;
     white-space: pre;
     width: 54mm;
+    -webkit-font-smoothing: none;
   }
 </style>
 </head>
@@ -332,8 +334,9 @@ export function OrderPrintReceipt({ order, className = "" }: Props) {
       className={`rounded border border-neutral-200 bg-white p-4 shadow-inner ${className}`}
       style={{
         fontFamily: "'Courier New', Courier, monospace",
-        fontSize: "11px",
-        lineHeight: "1.45",
+        fontSize: "13px",
+        fontWeight: 500,
+        lineHeight: "1.5",
         whiteSpace: "pre",
         overflowX: "auto",
         maxHeight: "60vh",

@@ -303,7 +303,12 @@ export const orderService = {
     return createdOrder;
   },
 
-  async updateStatus(restaurantId: string, orderId: string, input: UpdateStatusInput) {
+  async updateStatus(
+    restaurantId: string,
+    orderId: string,
+    input: UpdateStatusInput,
+    userId?: string
+  ) {
     const order = await orderRepository.findById(restaurantId, orderId);
     if (!order) throw new Error("Pedido não encontrado");
 
@@ -330,6 +335,48 @@ export const orderService = {
 
     if (updatedOrder.tab?.id) {
       await new TabService().recalculateTabTotal(restaurantId, updatedOrder.tab.id);
+    }
+
+    // Auto-create finance entry when order is finalized
+    if (input.status === "FINALIZADO") {
+      const resolvedUserId = userId ?? order.waiterId ?? order.customerId ?? "system";
+
+      // Avoid duplicates: only create if no finance entry already linked to this order
+      const existing = await prisma.financeEntry.findFirst({
+        where: { restaurantId, orderId },
+      });
+
+      if (!existing) {
+        const orderTypeLabel: Record<string, string> = {
+          DINE_IN: "Mesa",
+          TAKEOUT: "Retirada",
+          DELIVERY: "Delivery",
+        };
+        const typeLabel = orderTypeLabel[order.type] ?? order.type;
+        const tableInfo = order.tableNumber ? ` — Mesa ${order.tableNumber}` : "";
+        const paymentMethodMap: Record<string, string> = {
+          CASH: "Dinheiro",
+          PIX: "PIX",
+          CREDIT_CARD: "Cartão de Crédito",
+          DEBIT_CARD: "Cartão de Débito",
+          VOUCHER: "Voucher",
+        };
+        const paymentLabel = order.paymentMethod ? paymentMethodMap[order.paymentMethod] : null;
+
+        await prisma.financeEntry.create({
+          data: {
+            restaurantId,
+            orderId,
+            type: "REVENUE",
+            category: "Pedidos",
+            description: `Pedido #${order.orderNumber} (${typeLabel}${tableInfo})${paymentLabel ? ` — ${paymentLabel}` : ""}`,
+            amount: order.total,
+            date: new Date(),
+            paymentMethod: order.paymentMethod ?? null,
+            userId: resolvedUserId,
+          },
+        });
+      }
     }
 
     return updatedOrder;

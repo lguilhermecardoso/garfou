@@ -42,7 +42,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       );
     }
 
-    const order = await orderService.updateStatus(restaurantId, orderId, parsed.data);
+    const order = await orderService.updateStatus(
+      restaurantId,
+      orderId,
+      parsed.data,
+      access.userId
+    );
     return NextResponse.json({ data: order });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Erro interno";

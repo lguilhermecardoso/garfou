@@ -43,9 +43,7 @@ function CustomTooltip({
   return (
     <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-md">
       <p className="text-xs text-neutral-500">{label}</p>
-      <p className="text-sm font-bold text-neutral-900">
-        {formatCurrency(Math.round((payload[0]?.value ?? 0) * 100))}
-      </p>
+      <p className="text-sm font-bold text-neutral-900">{formatCurrency(payload[0]?.value ?? 0)}</p>
     </div>
   );
 }

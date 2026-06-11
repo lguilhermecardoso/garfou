@@ -129,6 +129,7 @@ interface KitchenOrder {
   type: string;
   notes: string | null;
   createdAt: string;
+  customer: { name: string } | null;
   items: {
     id: string;
     quantity: number;
@@ -430,7 +431,7 @@ function KitchenCard({
               )}
             </div>
 
-            {/* Order type + table */}
+            {/* Order type + table + customer */}
             <div className="mt-1 flex items-center gap-2">
               <TypeIcon className={`h-3.5 w-3.5 ${typeMeta.color}`} aria-hidden="true" />
               <span className={`text-xs font-medium ${typeMeta.color}`}>{typeMeta.label}</span>
@@ -438,6 +439,11 @@ function KitchenCard({
                 <span className="text-xs text-neutral-400">· Mesa {order.tableNumber}</span>
               )}
             </div>
+            {order.customer?.name && (
+              <div className="mt-1 text-xs font-medium text-neutral-300">
+                👤 {order.customer.name}
+              </div>
+            )}
           </div>
 
           {/* Timer */}
