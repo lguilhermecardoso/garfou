@@ -213,14 +213,14 @@ export function DigitalMenuClient({
       );
       const data = await response.json();
 
-      if (data.fee !== undefined) {
+      if (data.fee !== null && data.fee !== undefined) {
         setDeliveryFee(data.fee);
       } else {
+        // Zone not found — set 0 and warn but don't block the order
         setDeliveryFee(0);
-        toast.warning("Não entregamos nesta região no momento");
+        toast.info("Taxa de entrega a combinar — prossiga com o pedido");
       }
-    } catch (error) {
-      console.error("Error calculating delivery fee:", error);
+    } catch {
       setDeliveryFee(0);
     }
   }
@@ -364,10 +364,7 @@ export function DigitalMenuClient({
         toast.error("Por favor, preencha o endereço completo");
         return false;
       }
-      if (deliveryFee === 0) {
-        toast.error("Não entregamos nesta região");
-        return false;
-      }
+      // deliveryFee === 0 is allowed (free delivery or flat rate)
     }
     return true;
   }
@@ -1059,7 +1056,6 @@ export function DigitalMenuClient({
                       onChange={(event) => setDeliveryStreet(event.target.value)}
                       className="focus:ring-primary-400 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                       required
-                      disabled={isFetchingAddress}
                       aria-label="Rua"
                     />
 
@@ -1090,7 +1086,6 @@ export function DigitalMenuClient({
                       onChange={(event) => setDeliveryNeighborhood(event.target.value)}
                       className="focus:ring-primary-400 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                       required
-                      disabled={isFetchingAddress}
                       aria-label="Bairro"
                     />
 
@@ -1102,7 +1097,6 @@ export function DigitalMenuClient({
                         onChange={(event) => setDeliveryCity(event.target.value)}
                         className="focus:ring-primary-400 col-span-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
                         required
-                        disabled={isFetchingAddress}
                         aria-label="Cidade"
                       />
                       <input
@@ -1113,7 +1107,6 @@ export function DigitalMenuClient({
                         maxLength={2}
                         className="focus:ring-primary-400 w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm uppercase focus:ring-2 focus:outline-none"
                         required
-                        disabled={isFetchingAddress}
                         aria-label="Estado"
                       />
                     </div>

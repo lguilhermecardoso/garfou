@@ -7,7 +7,18 @@ import { toast } from "sonner";
 import { formatCurrency } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ShoppingCart, Plus, Minus, Search, ChefHat, X, Users, Store } from "lucide-react";
+import {
+  ShoppingCart,
+  Plus,
+  Minus,
+  Search,
+  ChefHat,
+  X,
+  Users,
+  Store,
+  Truck,
+  UtensilsCrossed,
+} from "lucide-react";
 import { PhoneInput } from "@/components/ui/masked-input";
 import { ProductDetailSheet } from "@/features/menu/product-detail-sheet";
 import {
@@ -64,6 +75,16 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [isOpeningTab, setIsOpeningTab] = useState(false);
+
+  // Delivery order state
+  const [orderMode, setOrderMode] = useState<"DINE_IN" | "DELIVERY">("DINE_IN");
+  const [deliveryStreet, setDeliveryStreet] = useState("");
+  const [deliveryNumber, setDeliveryNumber] = useState("");
+  const [deliveryComplement, setDeliveryComplement] = useState("");
+  const [deliveryNeighborhood, setDeliveryNeighborhood] = useState("");
+  const [deliveryCity, setDeliveryCity] = useState("");
+  const [deliveryState, setDeliveryState] = useState("");
+  const [deliveryFee, setDeliveryFee] = useState("");
 
   const { data: categories = [], isLoading } = useQuery<MenuCategory[]>({
     queryKey: ["menu", restaurantId, bearerToken ? "bff" : "auth"],
@@ -147,10 +168,18 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
     );
   }, [tabIds, tableNumber, tabs]);
 
-  // Clear cart when active tab changes
+  // Clear cart and delivery fields when active tab changes
   useEffect(() => {
     setCart([]);
     setIsCartOpen(false);
+    setOrderMode("DINE_IN");
+    setDeliveryStreet("");
+    setDeliveryNumber("");
+    setDeliveryComplement("");
+    setDeliveryNeighborhood("");
+    setDeliveryCity("");
+    setDeliveryState("");
+    setDeliveryFee("");
   }, [activeTabId]);
 
   function upsertCartItem(item: CartItem) {
@@ -270,7 +299,22 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
 
   async function submitOrder() {
     if (cart.length === 0 || !activeTab) return;
+
+    if (orderMode === "DELIVERY") {
+      if (
+        !deliveryStreet.trim() ||
+        !deliveryNumber.trim() ||
+        !deliveryNeighborhood.trim() ||
+        !deliveryCity.trim()
+      ) {
+        toast.error("Preencha o endereço de entrega completo");
+        return;
+      }
+    }
+
     try {
+      const deliveryFeeNum = orderMode === "DELIVERY" ? parseFloat(deliveryFee) || 0 : undefined;
+
       const res = await fetch(
         bearerToken ? `/api/bff/orders` : `/api/restaurants/${restaurantId}/orders`,
         {
@@ -280,10 +324,21 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
             ...(bearerToken && { Authorization: `Bearer ${bearerToken}` }),
           },
           body: JSON.stringify({
-            type: "DINE_IN",
+            type: orderMode,
             tabId: activeTab.id,
-            tableNumber: activeTab.table?.identifier,
+            tableNumber: orderMode === "DINE_IN" ? activeTab.table?.identifier : undefined,
             customerId: activeTab.customer?.id,
+            ...(orderMode === "DELIVERY" && {
+              deliveryFee: deliveryFeeNum,
+              deliveryAddress: {
+                street: deliveryStreet.trim(),
+                number: deliveryNumber.trim(),
+                complement: deliveryComplement.trim() || undefined,
+                district: deliveryNeighborhood.trim(),
+                city: deliveryCity.trim(),
+                state: deliveryState.trim().toUpperCase(),
+              },
+            }),
             items: cart.map((i) => ({
               productId: i.productId,
               quantity: i.quantity,
@@ -582,11 +637,105 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
                 </div>
               ))}
             </div>
-            <div className="border-t border-neutral-100 px-4 py-4">
-              <div className="mb-4 flex items-center justify-between">
+            <div className="space-y-4 border-t border-neutral-100 px-4 py-4">
+              {/* Order mode toggle */}
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => setOrderMode("DINE_IN")}
+                  className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition-colors ${
+                    orderMode === "DINE_IN"
+                      ? "border-primary-500 bg-primary-50 text-primary-700"
+                      : "border-neutral-200 text-neutral-600"
+                  }`}
+                >
+                  <UtensilsCrossed className="h-4 w-4" aria-hidden="true" />
+                  Local
+                </button>
+                <button
+                  onClick={() => setOrderMode("DELIVERY")}
+                  className={`flex items-center justify-center gap-2 rounded-xl border py-2.5 text-sm font-semibold transition-colors ${
+                    orderMode === "DELIVERY"
+                      ? "border-amber-500 bg-amber-50 text-amber-700"
+                      : "border-neutral-200 text-neutral-600"
+                  }`}
+                >
+                  <Truck className="h-4 w-4" aria-hidden="true" />
+                  Entrega
+                </button>
+              </div>
+
+              {/* Delivery address fields */}
+              {orderMode === "DELIVERY" && (
+                <div className="space-y-2 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                  <p className="text-xs font-semibold text-amber-700">Endereço de entrega</p>
+                  <input
+                    type="text"
+                    placeholder="Rua *"
+                    value={deliveryStreet}
+                    onChange={(e) => setDeliveryStreet(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Número *"
+                      value={deliveryNumber}
+                      onChange={(e) => setDeliveryNumber(e.target.value)}
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="Complemento"
+                      value={deliveryComplement}
+                      onChange={(e) => setDeliveryComplement(e.target.value)}
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Bairro *"
+                    value={deliveryNeighborhood}
+                    onChange={(e) => setDeliveryNeighborhood(e.target.value)}
+                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                  />
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      type="text"
+                      placeholder="Cidade *"
+                      value={deliveryCity}
+                      onChange={(e) => setDeliveryCity(e.target.value)}
+                      className="col-span-2 w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                    <input
+                      type="text"
+                      placeholder="UF"
+                      value={deliveryState}
+                      onChange={(e) => setDeliveryState(e.target.value.toUpperCase())}
+                      maxLength={2}
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm uppercase focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 shrink-0 text-amber-500" aria-hidden="true" />
+                    <input
+                      type="number"
+                      placeholder="Taxa de entrega (R$)"
+                      value={deliveryFee}
+                      onChange={(e) => setDeliveryFee(e.target.value)}
+                      min="0"
+                      step="0.50"
+                      className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:ring-2 focus:ring-amber-400 focus:outline-none"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between">
                 <span className="font-semibold text-neutral-700">Total</span>
                 <span className="text-xl font-bold text-neutral-900">
-                  {formatCurrency(cartTotal)}
+                  {formatCurrency(
+                    cartTotal + (orderMode === "DELIVERY" ? parseFloat(deliveryFee) || 0 : 0)
+                  )}
                 </span>
               </div>
               <Button
@@ -595,7 +744,9 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
                 onClick={submitOrder}
                 disabled={cart.length === 0 || !activeTab}
               >
-                Enviar pedido para cozinha
+                {orderMode === "DELIVERY"
+                  ? "Enviar pedido de entrega"
+                  : "Enviar pedido para cozinha"}
               </Button>
             </div>
           </div>
