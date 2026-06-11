@@ -58,6 +58,7 @@
 - [ ] Tempo estimado de preparo por produto (exibir no cardápio digital)
 - [ ] Auto-cancelar pedidos NOVO_PEDIDO sem resposta em X minutos (configurable)
 - [ ] Suporte a combos / produtos compostos
+- [x] Filtrar produtos pausados (`isPaused`) no cardápio digital público — 2026-06-11
 - [ ] Promoções por horário (happy hour)
 
 ---

@@ -2,13 +2,15 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireRole } from "@/lib/rbac";
 import { createCustomerSchema } from "@/lib/validations";
+import { findOrUpsertCustomerByPhone } from "@/repositories/customer.repository";
 
 type Params = { params: Promise<{ restaurantId: string }> };
 
 export async function GET(req: Request, { params }: Params) {
   const { restaurantId } = await params;
   const access = await requireRole(restaurantId, "MANAGER");
-  if ("error" in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if ("error" in access)
+    return NextResponse.json({ error: access.error }, { status: access.status });
 
   const { searchParams } = new URL(req.url);
   const q = searchParams.get("q");
@@ -20,12 +22,12 @@ export async function GET(req: Request, { params }: Params) {
     deletedAt: null as null,
     ...(q
       ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" as const } },
-          { phone: { contains: q } },
-          { email: { contains: q, mode: "insensitive" as const } },
-        ],
-      }
+          OR: [
+            { name: { contains: q, mode: "insensitive" as const } },
+            { phone: { contains: q } },
+            { email: { contains: q, mode: "insensitive" as const } },
+          ],
+        }
       : {}),
   };
 
@@ -46,28 +48,27 @@ export async function GET(req: Request, { params }: Params) {
 export async function POST(req: Request, { params }: Params) {
   const { restaurantId } = await params;
   const access = await requireRole(restaurantId, "WAITER");
-  if ("error" in access) return NextResponse.json({ error: access.error }, { status: access.status });
+  if ("error" in access)
+    return NextResponse.json({ error: access.error }, { status: access.status });
 
   const body = await req.json();
   const parsed = createCustomerSchema.safeParse({ ...body, restaurantId });
   if (!parsed.success) {
-    return NextResponse.json({ error: "Dados inválidos", details: parsed.error.flatten() }, { status: 400 });
+    return NextResponse.json(
+      { error: "Dados inválidos", details: parsed.error.flatten() },
+      { status: 400 }
+    );
   }
 
-  // Upsert by phone within same restaurant
   let customer;
   if (parsed.data.phone) {
-    const existing = await prisma.customer.findFirst({
-      where: { restaurantId, phone: parsed.data.phone, deletedAt: null },
+    customer = await findOrUpsertCustomerByPhone({
+      restaurantId,
+      phone: parsed.data.phone,
+      name: parsed.data.name,
+      email: parsed.data.email,
+      source: "MANUAL",
     });
-    if (existing) {
-      customer = await prisma.customer.update({
-        where: { id: existing.id },
-        data: { name: parsed.data.name, email: parsed.data.email },
-      });
-    } else {
-      customer = await prisma.customer.create({ data: { ...parsed.data, restaurantId } });
-    }
   } else {
     customer = await prisma.customer.create({ data: { ...parsed.data, restaurantId } });
   }

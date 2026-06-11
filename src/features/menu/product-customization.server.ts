@@ -157,6 +157,7 @@ export async function syncProductCustomization(
         categoryId: input.categoryId,
         sortOrder: input.sortOrder,
         isActive: input.isActive,
+        isPaused: input.isPaused,
         isInternalOnly: input.isInternalOnly,
         isFeatured: input.isFeatured,
         allowCustomization: input.allowCustomization,

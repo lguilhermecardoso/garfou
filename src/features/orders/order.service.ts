@@ -1,5 +1,6 @@
 import { orderRepository } from "@/repositories/order.repository";
 import { menuRepository } from "@/repositories/menu.repository";
+import { findOrUpsertCustomerByPhone } from "@/repositories/customer.repository";
 import { prisma } from "@/lib/db";
 import { TabService } from "@/features/tabs/tab.service";
 import type { z } from "zod";
@@ -56,34 +57,17 @@ export const orderService = {
       validatedTabId = tab.id;
     }
 
-    // Auto-create or find customer by phone if provided
+    // Find or upsert customer by phone (phone is the deduplication key)
     let customerId = input.customerId;
 
     if (!customerId && input.customerPhone) {
-      // Remove all non-digits from phone
-      const cleanPhone = input.customerPhone.replace(/\D/g, "");
-
-      // Try to find existing customer by phone
-      let customer = await prisma.customer.findFirst({
-        where: {
-          restaurantId,
-          phone: cleanPhone,
-        },
+      const customer = await findOrUpsertCustomerByPhone({
+        restaurantId,
+        phone: input.customerPhone,
+        name: input.customerName,
+        email: input.customerEmail || null,
+        source: "DIGITAL_MENU",
       });
-
-      // Create new customer if not found
-      if (!customer && input.customerName) {
-        customer = await prisma.customer.create({
-          data: {
-            restaurantId,
-            name: input.customerName,
-            phone: cleanPhone,
-            email: input.customerEmail || null,
-            source: "DIGITAL_MENU",
-          },
-        });
-      }
-
       customerId = customer?.id;
     }
 

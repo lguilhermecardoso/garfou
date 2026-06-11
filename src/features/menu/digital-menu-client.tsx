@@ -796,43 +796,62 @@ export function DigitalMenuClient({
         {!search && (
           <div className="overflow-x-auto border-b border-neutral-100 bg-white">
             <div className="mx-auto flex max-w-2xl gap-2 px-4 py-2.5">
-              <button
-                onClick={() => setActiveCategory(null)}
-                className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${!activeCategory ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600"}`}
-              >
-                Todos
-              </button>
-              {categories.map((category) => {
-                const isPromoCategory = category.name === "Promoção do Dia";
-                return (
+              {isLoading ? (
+                [72, 96, 80, 64, 88].map((w, i) => (
+                  <div
+                    key={i}
+                    className="h-8 shrink-0 animate-pulse rounded-full bg-neutral-200"
+                    style={{ width: w }}
+                  />
+                ))
+              ) : (
+                <>
                   <button
-                    key={category.id}
-                    onClick={() => setActiveCategory(category.id)}
-                    className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-                      activeCategory === category.id
-                        ? isPromoCategory
-                          ? "bg-red-500 text-white"
-                          : "bg-primary-500 text-white"
-                        : isPromoCategory
-                          ? "bg-red-50 text-red-600 ring-1 ring-red-200"
-                          : "bg-neutral-100 text-neutral-600"
-                    }`}
+                    onClick={() => setActiveCategory(null)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${!activeCategory ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600"}`}
                   >
-                    {isPromoCategory ? `🔥 ${category.name}` : category.name}
+                    Todos
                   </button>
-                );
-              })}
+                  {categories.map((category) => {
+                    const isPromoCategory = category.name === "Promoção do Dia";
+                    return (
+                      <button
+                        key={category.id}
+                        onClick={() => setActiveCategory(category.id)}
+                        className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                          activeCategory === category.id
+                            ? isPromoCategory
+                              ? "bg-red-500 text-white"
+                              : "bg-primary-500 text-white"
+                            : isPromoCategory
+                              ? "bg-red-50 text-red-600 ring-1 ring-red-200"
+                              : "bg-neutral-100 text-neutral-600"
+                        }`}
+                      >
+                        {isPromoCategory ? `🔥 ${category.name}` : category.name}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
             </div>
           </div>
         )}
 
         <main className="mx-auto max-w-2xl px-4 py-4" id="main-content">
           {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <div
-                className="border-primary-200 border-t-primary-500 h-8 w-8 animate-spin rounded-full border-4"
-                aria-label="Carregando..."
-              />
+            <div className="space-y-3" aria-busy="true" aria-label="Carregando cardápio...">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm">
+                  <div className="h-16 w-16 shrink-0 animate-pulse rounded-lg bg-neutral-200" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 animate-pulse rounded bg-neutral-200" />
+                    <div className="h-3 w-full animate-pulse rounded bg-neutral-100" />
+                    <div className="h-3 w-1/2 animate-pulse rounded bg-neutral-100" />
+                  </div>
+                  <div className="h-8 w-16 animate-pulse rounded-full bg-neutral-200" />
+                </div>
+              ))}
             </div>
           ) : displayed ? (
             <div className="space-y-3">

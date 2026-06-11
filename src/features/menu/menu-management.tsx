@@ -497,7 +497,7 @@ export function MenuManagement({ restaurantId }: Props) {
     categoryId?: string;
   }>({ open: false });
 
-  const { data: categories = [] } = useQuery<Category[]>({
+  const { data: categories = [], isLoading: categoriesLoading } = useQuery<Category[]>({
     queryKey: ["categories", restaurantId],
     queryFn: async () => {
       const res = await fetch(`/api/restaurants/${restaurantId}/categories`);
@@ -505,13 +505,15 @@ export function MenuManagement({ restaurantId }: Props) {
     },
   });
 
-  const { data: products = [] } = useQuery<Product[]>({
+  const { data: products = [], isLoading: productsLoading } = useQuery<Product[]>({
     queryKey: ["products", restaurantId],
     queryFn: async () => {
       const res = await fetch(`/api/restaurants/${restaurantId}/products`);
       return (await res.json()).data;
     },
   });
+
+  const isLoading = categoriesLoading || productsLoading;
 
   const deleteCategory = useMutation({
     mutationFn: async (id: string) => {
@@ -604,7 +606,13 @@ export function MenuManagement({ restaurantId }: Props) {
         </Button>
       </div>
 
-      {categories.length === 0 ? (
+      {isLoading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-16 animate-pulse rounded-2xl bg-white shadow-sm" />
+          ))}
+        </div>
+      ) : categories.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl bg-white py-16 text-center shadow-sm">
           <PackageX className="h-12 w-12 text-neutral-300" aria-hidden="true" />
           <h2 className="mt-4 text-lg font-semibold text-neutral-700">Nenhuma categoria ainda</h2>

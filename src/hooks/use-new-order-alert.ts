@@ -6,21 +6,13 @@ import { toast } from "sonner";
 const POLL_MS = 8_000;
 const PENDING_STATUSES = "NOVO_PEDIDO,AGUARDANDO_CONFIRMACAO";
 
-function playDoorbell() {
+function playNotification() {
   try {
-    const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.3);
-    gain.gain.setValueAtTime(0.35, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
-    osc.start();
-    osc.stop(ctx.currentTime + 0.6);
+    const audio = new Audio("/notification.wav");
+    audio.volume = 1.0;
+    audio.play().catch(() => {});
   } catch {
-    // Web Audio API not available
+    // Audio not available
   }
 }
 
@@ -47,7 +39,7 @@ export function useNewOrderAlert(restaurantId: string) {
 
         if (!isFirstLoad.current && prevCount.current !== null && count > prevCount.current) {
           const delta = count - prevCount.current;
-          playDoorbell();
+          playNotification();
           toast(
             `🔔 ${delta === 1 ? "Novo pedido recebido!" : `${delta} novos pedidos recebidos!`}`,
             {

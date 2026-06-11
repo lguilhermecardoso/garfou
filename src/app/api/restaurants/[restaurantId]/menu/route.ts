@@ -36,11 +36,13 @@ export async function GET(req: NextRequest, { params }: Params) {
     }));
 
     if (isPublic) {
-      // Filter internal-only products for public menu
-      const publicCategories = serializedCategories.map((cat) => ({
-        ...cat,
-        products: cat.products.filter((p) => !p.isInternalOnly),
-      }));
+      // Filter internal-only and paused products for public menu
+      const publicCategories = serializedCategories
+        .map((cat) => ({
+          ...cat,
+          products: cat.products.filter((p) => !p.isInternalOnly && !p.isPaused),
+        }))
+        .filter((cat) => cat.products.length > 0);
       return NextResponse.json({ data: publicCategories });
     }
 

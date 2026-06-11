@@ -1,5 +1,28 @@
 # GARFOU Progress Log
 
+## 2026-06-11
+
+### Completed
+
+- **Fix: Flash "Nenhuma categoria ainda" no gerenciamento de cardápio**
+  - `src/features/menu/menu-management.tsx` — extraiu `isLoading` das duas queries (`categoriesLoading || productsLoading`); adicionou skeleton de 3 linhas animadas enquanto carrega; "Nenhuma categoria ainda" agora só aparece após o loading terminar com array vazio
+
+- **Deduplicação de clientes por telefone (upsert)**
+  - `src/repositories/customer.repository.ts` (NOVO) — `findOrUpsertCustomerByPhone`: busca por `(restaurantId, phone)`, atualiza nome/email se mudaram, cria se não existe, retorna `null` se telefone vazio ou primeiro pedido sem nome
+  - `src/features/orders/order.service.ts` — substituiu lógica inline de findFirst+create pelo repositório; 25 linhas → 8 linhas
+  - `src/app/api/restaurants/[restaurantId]/customers/route.ts` — substituiu lógica duplicada pelo mesmo repositório com `source: "MANUAL"`
+  - Estratégia: telefone é a chave canônica de deduplicação — mesmo cliente que pede como "Gui", "Guilherme" ou "Luis Guilherme" é identificado pelo número e tem nome atualizado no upsert
+
+- **Som de notificação: troca Web Audio API sintético → notification.wav**
+  - `public/notification.wav` — arquivo de som adicionado
+  - `src/hooks/use-notification-sound.tsx` — substituiu osciladores sintéticos por `<Audio>` com `loop = true` e `volume = 1.0`; play/stop controlam o loop
+  - `src/hooks/use-new-order-alert.ts` — substituiu `playDoorbell()` sintético por `notification.wav` com `volume = 1.0`
+
+- **Cardápio digital: skeleton loading + filtro de produtos pausados**
+  - `src/features/menu/digital-menu-client.tsx` — substituiu spinner por skeleton de 5 cards animados durante loading; adicionou skeleton nas tabs de categoria
+  - `src/app/api/restaurants/[restaurantId]/menu/route.ts` — menu público agora filtra `isPaused` além de `isInternalOnly`; remove categorias que ficam vazias após o filtro
+  - `src/features/menu/product-customization.server.ts` — `syncProductCustomization` agora persiste campo `isPaused`
+
 ## 2026-05-14
 
 ### Completed (Features sem dependências externas)
