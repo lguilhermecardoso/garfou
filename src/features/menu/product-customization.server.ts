@@ -103,6 +103,7 @@ export function buildProductCreateInput(
     splitPriceRule: input.splitPriceRule,
     preparationTime: input.preparationTime,
     costPrice: input.costPrice,
+    promotionExpiresAt: input.promotionExpiresAt ? new Date(input.promotionExpiresAt) : null,
     image: input.image ?? undefined,
     modifierGroups: input.allowCustomization
       ? {
@@ -164,6 +165,12 @@ export async function syncProductCustomization(
         splitPriceRule: input.splitPriceRule,
         preparationTime: input.preparationTime,
         costPrice: input.costPrice,
+        promotionExpiresAt:
+          input.promotionExpiresAt !== undefined
+            ? input.promotionExpiresAt
+              ? new Date(input.promotionExpiresAt)
+              : null
+            : undefined,
         ...(input.image !== undefined ? { image: input.image } : {}),
       },
     });

@@ -170,6 +170,9 @@ function ProductModal({
     isFeatured: initial?.isFeatured ?? false,
     isInternalOnly: initial?.isInternalOnly ?? false,
     image: (initial?.image ?? null) as string | null,
+    promotionExpiresAt: initial?.promotionExpiresAt
+      ? new Date(initial.promotionExpiresAt).toISOString().slice(0, 16)
+      : "",
   });
   const [customization, setCustomization] = useState<ProductCustomizationFormState>(
     getInitialCustomization(initial)
@@ -228,6 +231,9 @@ function ProductModal({
       const payload = {
         ...form,
         price: splitPricingActive ? 0 : Number(form.price || 0),
+        promotionExpiresAt: form.promotionExpiresAt
+          ? new Date(form.promotionExpiresAt).toISOString()
+          : null,
         ...customization,
         allowCustomization: hasCustomization,
         modifierGroups: mergedGroups,
@@ -344,7 +350,7 @@ function ProductModal({
                   onChange={(event) => updateField("isFeatured", event.target.checked)}
                   className="h-4 w-4 rounded border-neutral-300"
                 />
-                Destaque
+                ⭐ Destaque
               </label>
               <label className="flex cursor-pointer items-center gap-2 text-sm text-neutral-700">
                 <input
@@ -356,6 +362,21 @@ function ProductModal({
                 Apenas interno
               </label>
             </div>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-neutral-700">
+                🔥 Promoção — válido até (opcional)
+              </span>
+              <input
+                type="datetime-local"
+                value={form.promotionExpiresAt}
+                onChange={(event) => updateField("promotionExpiresAt", event.target.value)}
+                className="focus:ring-primary-400 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:outline-none"
+              />
+              <p className="text-xs text-neutral-500">
+                Deixe vazio para sem expiração. Quando a data passar, o produto some do cardápio
+                automaticamente.
+              </p>
+            </label>
           </div>
 
           <ProductCustomizationPanel

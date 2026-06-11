@@ -116,6 +116,7 @@ const baseProductSchema = z.object({
   splitPriceRule: z.enum(["HIGHEST", "AVERAGE", "SUM"]).default("HIGHEST"),
   preparationTime: z.number().int().positive().optional(),
   costPrice: z.number().positive().optional(),
+  promotionExpiresAt: z.string().datetime().optional().nullable(),
   image: z.string().url().optional().nullable(),
   modifierGroups: z.array(modifierGroupSchema).default([]),
   splitFlavors: z.array(splitFlavorSchema).default([]),

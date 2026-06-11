@@ -192,7 +192,15 @@ export function DigitalMenuClient({
   const allProducts: DisplayProduct[] = useMemo(
     () =>
       categories.flatMap((category) =>
-        category.products.map((product) => ({ ...product, categoryId: category.id }))
+        category.products
+          .filter((product) => {
+            // Hide expired promotions
+            if (product.promotionExpiresAt) {
+              return new Date(product.promotionExpiresAt) > new Date();
+            }
+            return true;
+          })
+          .map((product) => ({ ...product, categoryId: category.id }))
       ),
     [categories]
   );
@@ -235,6 +243,15 @@ export function DigitalMenuClient({
         .map((item) => (item.id === itemId ? { ...item, quantity: item.quantity - 1 } : item))
         .filter((item) => item.quantity > 0)
     );
+  }
+
+  function formatPromoExpiry(expiresAt: string) {
+    const d = new Date(expiresAt);
+    const day = d.getDate().toString().padStart(2, "0");
+    const month = (d.getMonth() + 1).toString().padStart(2, "0");
+    const hours = d.getHours().toString().padStart(2, "0");
+    const minutes = d.getMinutes().toString().padStart(2, "0");
+    return `${day}/${month} às ${hours}:${minutes}`;
   }
 
   const cartTotal = cart.reduce((acc, item) => acc + getCartItemUnitPrice(item) * item.quantity, 0);
@@ -779,15 +796,26 @@ export function DigitalMenuClient({
               >
                 Todos
               </button>
-              {categories.map((category) => (
-                <button
-                  key={category.id}
-                  onClick={() => setActiveCategory(category.id)}
-                  className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${activeCategory === category.id ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600"}`}
-                >
-                  {category.name}
-                </button>
-              ))}
+              {categories.map((category) => {
+                const isPromoCategory = category.name === "Promoção do Dia";
+                return (
+                  <button
+                    key={category.id}
+                    onClick={() => setActiveCategory(category.id)}
+                    className={`shrink-0 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                      activeCategory === category.id
+                        ? isPromoCategory
+                          ? "bg-red-500 text-white"
+                          : "bg-primary-500 text-white"
+                        : isPromoCategory
+                          ? "bg-red-50 text-red-600 ring-1 ring-red-200"
+                          : "bg-neutral-100 text-neutral-600"
+                    }`}
+                  >
+                    {isPromoCategory ? `🔥 ${category.name}` : category.name}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -808,11 +836,18 @@ export function DigitalMenuClient({
                   .reduce((acc, item) => acc + item.quantity, 0);
                 const requiresConfiguration = product.allowCustomization || product.allowSplit;
                 const productPaused = product.isPaused === true;
+                const productFeatured = product.isFeatured === true;
 
                 return (
                   <div
                     key={product.id}
-                    className={`flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm ${productPaused ? "opacity-60" : ""}`}
+                    className={`flex items-center gap-3 rounded-xl p-4 shadow-sm ${
+                      productPaused
+                        ? "bg-white opacity-60"
+                        : productFeatured
+                          ? "bg-white ring-2 ring-red-400"
+                          : "bg-white"
+                    }`}
                   >
                     <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
                       {product.image ? (
@@ -837,6 +872,16 @@ export function DigitalMenuClient({
                         <p className="text-primary-500 font-bold">
                           {formatCurrency(product.price)}
                         </p>
+                        {productFeatured && !product.promotionExpiresAt && (
+                          <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
+                            ⭐ Destaque
+                          </span>
+                        )}
+                        {product.promotionExpiresAt && (
+                          <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-medium text-red-700">
+                            🔥 Válido até {formatPromoExpiry(product.promotionExpiresAt)}
+                          </span>
+                        )}
                         {requiresConfiguration && !productPaused && (
                           <span className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-600">
                             Personalizável
@@ -884,96 +929,135 @@ export function DigitalMenuClient({
             </div>
           ) : (
             <div className="space-y-8">
-              {categories.map((category) => (
-                <div key={category.id}>
-                  <h2 className="mb-3 text-lg font-bold text-neutral-900">{category.name}</h2>
-                  <div className="space-y-3">
-                    {category.products.map((product) => {
-                      const totalForProduct = cart
-                        .filter((item) => item.productId === product.id)
-                        .reduce((acc, item) => acc + item.quantity, 0);
-                      const requiresConfiguration =
-                        product.allowCustomization || product.allowSplit;
-                      const productPaused = product.isPaused === true;
-
-                      return (
-                        <div
-                          key={product.id}
-                          className={`flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm ${productPaused ? "opacity-60" : ""}`}
-                        >
-                          <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
-                            {product.image ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={product.image}
-                                alt={product.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <UtensilsCrossed
-                                className="h-6 w-6 text-neutral-300"
-                                aria-hidden="true"
-                              />
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-semibold text-neutral-900">{product.name}</p>
-                            {product.description && (
-                              <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">
-                                {product.description}
-                              </p>
-                            )}
-                            <div className="mt-1 flex flex-wrap items-center gap-2">
-                              <p className="text-primary-500 font-bold">
-                                {formatCurrency(product.price)}
-                              </p>
-                              {requiresConfiguration && !productPaused && (
-                                <span className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-600">
-                                  Personalizável
-                                </span>
-                              )}
-                              {productPaused && (
-                                <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
-                                  Esgotado — em breve voltamos!
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          {isOpen && !productPaused && (
-                            <div className="flex shrink-0 items-center gap-1.5">
-                              {totalForProduct > 0 ? (
-                                <>
-                                  <button
-                                    onClick={() => decrementCartItem(product.id)}
-                                    className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200"
-                                    aria-label={`Remover ${product.name}`}
-                                  >
-                                    <Minus className="h-3 w-3" aria-hidden="true" />
-                                  </button>
-                                  <span className="min-w-[1.25rem] text-center text-sm font-bold">
-                                    {totalForProduct}
-                                  </span>
-                                  <button
-                                    onClick={() => setSelectedProduct(product)}
-                                    className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
-                                    aria-label={`Adicionar mais ${product.name}`}
-                                  >
-                                    <Plus className="h-3 w-3" aria-hidden="true" />
-                                  </button>
-                                </>
-                              ) : (
-                                <Button size="sm" onClick={() => setSelectedProduct(product)}>
-                                  {requiresConfiguration ? "Escolher" : "Adicionar"}
-                                </Button>
-                              )}
-                            </div>
-                          )}
+              {categories.map((category) => {
+                const isPromoCategory = category.name === "Promoção do Dia";
+                return (
+                  <div key={category.id}>
+                    {isPromoCategory ? (
+                      <div className="mb-3 flex items-center gap-2 rounded-xl bg-gradient-to-r from-red-500 to-orange-400 px-4 py-3">
+                        <span className="text-xl">🔥</span>
+                        <div>
+                          <h2 className="text-base font-bold text-white">{category.name}</h2>
+                          <p className="text-xs text-red-100">
+                            Ofertas especiais com tempo limitado
+                          </p>
                         </div>
-                      );
-                    })}
+                      </div>
+                    ) : (
+                      <h2 className="mb-3 text-lg font-bold text-neutral-900">{category.name}</h2>
+                    )}
+                    <div className="space-y-3">
+                      {category.products
+                        .filter(
+                          (p) =>
+                            !p.promotionExpiresAt || new Date(p.promotionExpiresAt) > new Date()
+                        )
+                        .map((product) => {
+                          const totalForProduct = cart
+                            .filter((item) => item.productId === product.id)
+                            .reduce((acc, item) => acc + item.quantity, 0);
+                          const requiresConfiguration =
+                            product.allowCustomization || product.allowSplit;
+                          const productPaused = product.isPaused === true;
+
+                          const productFeatured = product.isFeatured === true;
+                          return (
+                            <div
+                              key={product.id}
+                              className={`flex items-center gap-3 rounded-xl p-4 shadow-sm ${
+                                productPaused
+                                  ? "bg-white opacity-60"
+                                  : isPromoCategory || productFeatured
+                                    ? "bg-white ring-2 ring-red-400"
+                                    : "bg-white"
+                              }`}
+                            >
+                              <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-neutral-100">
+                                {product.image ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={product.image}
+                                    alt={product.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <UtensilsCrossed
+                                    className="h-6 w-6 text-neutral-300"
+                                    aria-hidden="true"
+                                  />
+                                )}
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-semibold text-neutral-900">
+                                  {product.name}
+                                </p>
+                                {product.description && (
+                                  <p className="mt-0.5 line-clamp-2 text-xs text-neutral-500">
+                                    {product.description}
+                                  </p>
+                                )}
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <p className="text-primary-500 font-bold">
+                                    {formatCurrency(product.price)}
+                                  </p>
+                                  {productFeatured && !product.promotionExpiresAt && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
+                                      ⭐ Destaque
+                                    </span>
+                                  )}
+                                  {product.promotionExpiresAt && (
+                                    <span className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-medium text-red-700">
+                                      🔥 Válido até {formatPromoExpiry(product.promotionExpiresAt)}
+                                    </span>
+                                  )}
+                                  {requiresConfiguration && !productPaused && (
+                                    <span className="rounded-full bg-neutral-100 px-2 py-1 text-[11px] font-medium text-neutral-600">
+                                      Personalizável
+                                    </span>
+                                  )}
+                                  {productPaused && (
+                                    <span className="rounded-full bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-700">
+                                      Esgotado — em breve voltamos!
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                              {isOpen && !productPaused && (
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  {totalForProduct > 0 ? (
+                                    <>
+                                      <button
+                                        onClick={() => decrementCartItem(product.id)}
+                                        className="flex h-7 w-7 items-center justify-center rounded-full bg-neutral-200"
+                                        aria-label={`Remover ${product.name}`}
+                                      >
+                                        <Minus className="h-3 w-3" aria-hidden="true" />
+                                      </button>
+                                      <span className="min-w-[1.25rem] text-center text-sm font-bold">
+                                        {totalForProduct}
+                                      </span>
+                                      <button
+                                        onClick={() => setSelectedProduct(product)}
+                                        className="bg-primary-500 flex h-7 w-7 items-center justify-center rounded-full text-white"
+                                        aria-label={`Adicionar mais ${product.name}`}
+                                      >
+                                        <Plus className="h-3 w-3" aria-hidden="true" />
+                                      </button>
+                                    </>
+                                  ) : (
+                                    <Button size="sm" onClick={() => setSelectedProduct(product)}>
+                                      {requiresConfiguration ? "Escolher" : "Adicionar"}
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}{" "}
             </div>
           )}
         </main>

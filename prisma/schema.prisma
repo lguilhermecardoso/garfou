@@ -214,8 +214,9 @@ model Product {
   allowSplit      Boolean  @default(false)
   maxSplits       Int      @default(2)
   splitPriceRule  SplitPriceRule @default(HIGHEST)
-  preparationTime Int?     // minutes
-  costPrice       Decimal? @db.Decimal(10, 2)
+  preparationTime     Int?     // minutes
+  costPrice           Decimal? @db.Decimal(10, 2)
+  promotionExpiresAt  DateTime? // null = sem expiração / promoção permanente
 
   restaurant      Restaurant          @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
   category        Category            @relation(fields: [categoryId], references: [id])
