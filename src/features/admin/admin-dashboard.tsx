@@ -45,6 +45,7 @@ interface AdminStats {
   pendingCount: number;
   totalRestaurants: number;
   activePaying: number;
+  payingWithStripe: number;
   trialing: number;
   pastDue: number;
   canceled: number;
@@ -236,7 +237,7 @@ export function AdminDashboard() {
       icon: TrendingUp,
       color: "text-emerald-600",
       bg: "bg-emerald-50",
-      sub: "mín. (plano Starter × pagantes)",
+      sub: `Starter × ${stats?.payingWithStripe ?? 0} c/ Stripe ativo`,
     },
     {
       label: "Taxas coletadas",

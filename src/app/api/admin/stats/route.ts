@@ -69,7 +69,11 @@ export async function GET(req: NextRequest) {
   // Estimate MRR: we can't know which plan without calling Stripe for each sub.
   // Use the cheapest plan price as a conservative floor; real MRR is in Stripe dashboard.
   const activePaying = statusMap["ACTIVE"] ?? 0;
-  const estimatedMRR = activePaying * STRIPE_PLANS.STARTER.price; // cents
+  // Only count restaurants that have an active Stripe subscription (hasStripeSubscription)
+  const payingWithStripe = allRestaurants.filter(
+    (r) => r.subscriptionStatus === "ACTIVE" && r.stripeSubscriptionId
+  ).length;
+  const estimatedMRR = payingWithStripe * STRIPE_PLANS.STARTER.price; // cents
 
   return NextResponse.json({
     data: {
@@ -80,6 +84,7 @@ export async function GET(req: NextRequest) {
       // Subscriptions
       totalRestaurants,
       activePaying,
+      payingWithStripe,
       trialing: statusMap["TRIALING"] ?? 0,
       pastDue: statusMap["PAST_DUE"] ?? 0,
       canceled: statusMap["CANCELED"] ?? 0,
