@@ -288,13 +288,9 @@ export const CEPInput = forwardRef<HTMLInputElement, CEPInputProps>(
 
     useEffect(() => {
       if (value && typeof value === "string") {
-        const isValid = validateCEP(value);
-        onValidate?.(isValid);
-        if (isValid) {
-          onCEPComplete?.(value.replace(/\D/g, ""));
-        }
+        onValidate?.(validateCEP(value));
       }
-    }, [value, onValidate, onCEPComplete]);
+    }, [value, onValidate]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       const masked = maskCEP(e.target.value);
@@ -304,8 +300,12 @@ export const CEPInput = forwardRef<HTMLInputElement, CEPInputProps>(
     };
 
     const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      const raw = e.target.value.replace(/\D/g, "");
       if (e.target.value && !validateCEP(e.target.value)) {
         setError("CEP inválido. Use o formato XXXXX-XXX");
+      } else if (raw.length === 8) {
+        // Only fetch on blur when CEP is complete and valid
+        onCEPComplete?.(raw);
       }
       onBlur?.(e);
     };

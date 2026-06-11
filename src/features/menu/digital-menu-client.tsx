@@ -1045,7 +1045,6 @@ export function DigitalMenuClient({
                       onChange={(event) => setDeliveryCEP(event.target.value)}
                       onCEPComplete={fetchAddressByCEP}
                       required
-                      disabled={isFetchingAddress}
                       aria-label="CEP"
                     />
 
