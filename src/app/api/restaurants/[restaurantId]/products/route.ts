@@ -30,7 +30,7 @@ export async function GET(req: Request, { params }: Params) {
       category: { select: { id: true, name: true } },
       ...productCustomizationInclude,
     },
-    orderBy: { name: "asc" },
+    orderBy: { sortOrder: "asc" },
   });
 
   return NextResponse.json({ data: products.map(serializeProductWithCustomization) });

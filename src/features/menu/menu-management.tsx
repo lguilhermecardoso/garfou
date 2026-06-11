@@ -8,12 +8,13 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
   ChevronDown,
   ChevronRight,
   EyeOff,
+  GripVertical,
   PackageX,
   Pause,
   Pencil,
@@ -33,6 +34,14 @@ import {
 } from "@/features/menu/product-customization-panel";
 import type { MenuProductData } from "@/features/menu/menu-customization-types";
 import { formatCurrency } from "@/lib/utils";
+import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Category {
   id: string;
@@ -485,6 +494,41 @@ function ProductModal({
   );
 }
 
+function SortableRow({
+  id,
+  children,
+}: {
+  id: string;
+  children: (handle: React.ReactNode, isDragging: boolean) => React.ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+  });
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+    zIndex: isDragging ? 10 : undefined,
+    position: isDragging ? ("relative" as const) : undefined,
+  };
+  const handle = (
+    <button
+      {...attributes}
+      {...listeners}
+      className="cursor-grab touch-none p-1.5 text-neutral-300 hover:text-neutral-500 active:cursor-grabbing"
+      aria-label="Arrastar para reordenar"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <GripVertical className="h-4 w-4" aria-hidden="true" />
+    </button>
+  );
+  return (
+    <div ref={setNodeRef} style={style}>
+      {children(handle, isDragging)}
+    </div>
+  );
+}
+
 export function MenuManagement({ restaurantId }: Props) {
   const queryClient = useQueryClient();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
@@ -514,6 +558,55 @@ export function MenuManagement({ restaurantId }: Props) {
   });
 
   const isLoading = categoriesLoading || productsLoading;
+
+  // Local ordered state for optimistic DnD reordering
+  const [localCategories, setLocalCategories] = useState<Category[]>([]);
+  const [localProducts, setLocalProducts] = useState<Product[]>([]);
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    setLocalCategories(categories);
+  }, [categories]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => {
+    setLocalProducts(products);
+  }, [products]);
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+
+  function handleCategoryDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = localCategories.findIndex((c) => c.id === active.id);
+    const newIndex = localCategories.findIndex((c) => c.id === over.id);
+    const reordered = arrayMove(localCategories, oldIndex, newIndex);
+    setLocalCategories(reordered);
+    fetch(`/api/restaurants/${restaurantId}/categories/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((c) => c.id) }),
+    }).catch(() => {
+      setLocalCategories(categories);
+      toast.error("Erro ao reordenar categorias.");
+    });
+  }
+
+  function handleProductDragEnd(categoryId: string, snapshot: Product[], event: DragEndEvent) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = snapshot.findIndex((p) => p.id === active.id);
+    const newIndex = snapshot.findIndex((p) => p.id === over.id);
+    const reordered = arrayMove(snapshot, oldIndex, newIndex);
+    setLocalProducts((prev) => [...prev.filter((p) => p.categoryId !== categoryId), ...reordered]);
+    fetch(`/api/restaurants/${restaurantId}/products/reorder`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: reordered.map((p) => p.id) }),
+    }).catch(() => {
+      setLocalProducts(products);
+      toast.error("Erro ao reordenar produtos.");
+    });
+  }
 
   const deleteCategory = useMutation({
     mutationFn: async (id: string) => {
@@ -625,202 +718,242 @@ export function MenuManagement({ restaurantId }: Props) {
           </Button>
         </div>
       ) : (
-        <div className="space-y-3">
-          {categories.map((category) => {
-            const categoryProducts = products.filter(
-              (product) => product.categoryId === category.id
-            );
-            const isExpanded = expandedCategory === category.id;
+        <DndContext sensors={sensors} onDragEnd={handleCategoryDragEnd}>
+          <SortableContext
+            items={localCategories.map((c) => c.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {localCategories.map((category) => {
+                const categoryProducts = localProducts.filter(
+                  (product) => product.categoryId === category.id
+                );
+                const isExpanded = expandedCategory === category.id;
 
-            return (
-              <div key={category.id} className="overflow-hidden rounded-2xl bg-white shadow-sm">
-                <div
-                  className="flex cursor-pointer items-center gap-3 px-4 py-3 transition-colors hover:bg-neutral-50"
-                  onClick={() => setExpandedCategory(isExpanded ? null : category.id)}
-                >
-                  {isExpanded ? (
-                    <ChevronDown className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
-                  ) : (
-                    <ChevronRight
-                      className="h-4 w-4 shrink-0 text-neutral-400"
-                      aria-hidden="true"
-                    />
-                  )}
-                  <div className="flex-1">
-                    <span className="font-semibold text-neutral-900">{category.name}</span>
-                    <span className="ml-2 text-xs text-neutral-400">
-                      {categoryProducts.length} produto{categoryProducts.length !== 1 ? "s" : ""}
-                    </span>
-                  </div>
-                  <div
-                    className="flex items-center gap-1"
-                    onClick={(event) => event.stopPropagation()}
-                  >
-                    <button
-                      onClick={() => setProductModal({ open: true, categoryId: category.id })}
-                      className="hover:text-primary-500 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
-                      aria-label={`Adicionar produto em ${category.name}`}
-                    >
-                      <Plus className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    <button
-                      onClick={() => setCategoryModal({ open: true, editing: category })}
-                      className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
-                      aria-label={`Editar ${category.name}`}
-                    >
-                      <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (categoryProducts.length > 0) {
-                          toast.warning("Remova os produtos antes de excluir a categoria.");
-                          return;
-                        }
-                        if (confirm(`Excluir \"${category.name}\"?`))
-                          deleteCategory.mutate(category.id);
-                      }}
-                      className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500"
-                      aria-label={`Excluir ${category.name}`}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                    </button>
-                  </div>
-                </div>
-
-                {isExpanded && (
-                  <div className="border-t border-neutral-100">
-                    {categoryProducts.length === 0 ? (
-                      <div className="py-6 text-center text-sm text-neutral-400">
-                        Nenhum produto nesta categoria.{" "}
-                        <button
-                          onClick={() => setProductModal({ open: true, categoryId: category.id })}
-                          className="text-primary-500 hover:underline"
-                        >
-                          Adicionar
-                        </button>
-                      </div>
-                    ) : (
-                      categoryProducts.map((product, index) => (
+                return (
+                  <SortableRow key={category.id} id={category.id}>
+                    {(dragHandle) => (
+                      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
                         <div
-                          key={product.id}
-                          className={`flex items-center gap-3 px-4 py-3 ${index < categoryProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : product.isPaused ? "opacity-70" : ""}`}
+                          className="flex cursor-pointer items-center gap-2 px-4 py-3 transition-colors hover:bg-neutral-50"
+                          onClick={() => setExpandedCategory(isExpanded ? null : category.id)}
                         >
-                          <div className="min-w-0 flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-sm font-semibold text-neutral-900">
-                                {product.name}
-                              </p>
-                              {product.isFeatured && (
-                                <Star
-                                  className="text-accent-500 h-3.5 w-3.5 shrink-0"
-                                  aria-label="Destaque"
-                                />
-                              )}
-                              {product.allowSplit && (
-                                <Split
-                                  className="h-3.5 w-3.5 shrink-0 text-sky-500"
-                                  aria-label="Divisível"
-                                />
-                              )}
-                              {product.isInternalOnly && (
-                                <EyeOff
-                                  className="h-3.5 w-3.5 shrink-0 text-neutral-400"
-                                  aria-label="Apenas interno"
-                                />
-                              )}
-                              {product.allowCustomization && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Modificadores
-                                </Badge>
-                              )}
-                              {!product.isActive && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Inativo
-                                </Badge>
-                              )}
-                              {product.isPaused && (
-                                <Badge className="bg-amber-100 text-xs text-amber-700 hover:bg-amber-100">
-                                  Pausado
-                                </Badge>
-                              )}
-                            </div>
-                            {product.description && (
-                              <p className="truncate text-xs text-neutral-400">
-                                {product.description}
-                              </p>
-                            )}
+                          {dragHandle}
+                          {isExpanded ? (
+                            <ChevronDown
+                              className="h-4 w-4 shrink-0 text-neutral-400"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <ChevronRight
+                              className="h-4 w-4 shrink-0 text-neutral-400"
+                              aria-hidden="true"
+                            />
+                          )}
+                          <div className="flex-1">
+                            <span className="font-semibold text-neutral-900">{category.name}</span>
+                            <span className="ml-2 text-xs text-neutral-400">
+                              {categoryProducts.length} produto
+                              {categoryProducts.length !== 1 ? "s" : ""}
+                            </span>
                           </div>
-                          <span className="shrink-0 text-sm font-bold text-neutral-900">
-                            {formatCurrency(product.price)}
-                          </span>
-                          <div className="flex shrink-0 items-center gap-1">
+                          <div
+                            className="flex items-center gap-1"
+                            onClick={(event) => event.stopPropagation()}
+                          >
                             <button
                               onClick={() =>
-                                pauseProduct.mutate({
-                                  id: product.id,
-                                  isPaused: !(product.isPaused ?? false),
-                                })
+                                setProductModal({ open: true, categoryId: category.id })
                               }
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${(product.isPaused ?? false) ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-neutral-100 text-neutral-500 hover:bg-amber-50 hover:text-amber-600"}`}
-                              aria-label={
-                                (product.isPaused ?? false)
-                                  ? "Retomar produto"
-                                  : "Pausar produto (esgotado por agora)"
-                              }
-                              title={
-                                (product.isPaused ?? false)
-                                  ? "Clique para retomar"
-                                  : "Pausar — aparece como esgotado no menu"
-                              }
+                              className="hover:text-primary-500 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
+                              aria-label={`Adicionar produto em ${category.name}`}
                             >
-                              {(product.isPaused ?? false) ? (
-                                <span className="flex items-center gap-1">
-                                  <Play className="h-3 w-3" aria-hidden="true" />
-                                  Pausado
-                                </span>
-                              ) : (
-                                <Pause className="h-3 w-3" aria-hidden="true" />
-                              )}
+                              <Plus className="h-4 w-4" aria-hidden="true" />
                             </button>
                             <button
-                              onClick={() =>
-                                toggleProduct.mutate({
-                                  id: product.id,
-                                  isActive: !(product.isActive ?? true),
-                                })
-                              }
-                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${(product.isActive ?? true) ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}
-                              aria-label={(product.isActive ?? true) ? "Desativar" : "Ativar"}
-                            >
-                              {(product.isActive ?? true) ? "Ativo" : "Inativo"}
-                            </button>
-                            <button
-                              onClick={() => setProductModal({ open: true, editing: product })}
-                              className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
-                              aria-label={`Editar ${product.name}`}
+                              onClick={() => setCategoryModal({ open: true, editing: category })}
+                              className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                              aria-label={`Editar ${category.name}`}
                             >
                               <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                             <button
                               onClick={() => {
-                                if (confirm(`Excluir \"${product.name}\"?`))
-                                  deleteProduct.mutate(product.id);
+                                if (categoryProducts.length > 0) {
+                                  toast.warning("Remova os produtos antes de excluir a categoria.");
+                                  return;
+                                }
+                                if (confirm(`Excluir \"${category.name}\"?`))
+                                  deleteCategory.mutate(category.id);
                               }}
                               className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500"
-                              aria-label={`Excluir ${product.name}`}
+                              aria-label={`Excluir ${category.name}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         </div>
-                      ))
+
+                        {isExpanded && (
+                          <div className="border-t border-neutral-100">
+                            {categoryProducts.length === 0 ? (
+                              <div className="py-6 text-center text-sm text-neutral-400">
+                                Nenhum produto nesta categoria.{" "}
+                                <button
+                                  onClick={() =>
+                                    setProductModal({ open: true, categoryId: category.id })
+                                  }
+                                  className="text-primary-500 hover:underline"
+                                >
+                                  Adicionar
+                                </button>
+                              </div>
+                            ) : (
+                              <DndContext
+                                sensors={sensors}
+                                onDragEnd={(e) =>
+                                  handleProductDragEnd(category.id, categoryProducts, e)
+                                }
+                              >
+                                <SortableContext
+                                  items={categoryProducts.map((p) => p.id)}
+                                  strategy={verticalListSortingStrategy}
+                                >
+                                  {categoryProducts.map((product, index) => (
+                                    <SortableRow key={product.id} id={product.id}>
+                                      {(productHandle) => (
+                                        <div
+                                          className={`flex items-center gap-2 px-4 py-3 ${index < categoryProducts.length - 1 ? "border-b border-neutral-50" : ""} ${!product.isActive ? "opacity-50" : product.isPaused ? "opacity-70" : ""}`}
+                                        >
+                                          {productHandle}
+                                          <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <p className="truncate text-sm font-semibold text-neutral-900">
+                                                {product.name}
+                                              </p>
+                                              {product.isFeatured && (
+                                                <Star
+                                                  className="text-accent-500 h-3.5 w-3.5 shrink-0"
+                                                  aria-label="Destaque"
+                                                />
+                                              )}
+                                              {product.allowSplit && (
+                                                <Split
+                                                  className="h-3.5 w-3.5 shrink-0 text-sky-500"
+                                                  aria-label="Divisível"
+                                                />
+                                              )}
+                                              {product.isInternalOnly && (
+                                                <EyeOff
+                                                  className="h-3.5 w-3.5 shrink-0 text-neutral-400"
+                                                  aria-label="Apenas interno"
+                                                />
+                                              )}
+                                              {product.allowCustomization && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                  Modificadores
+                                                </Badge>
+                                              )}
+                                              {!product.isActive && (
+                                                <Badge variant="secondary" className="text-xs">
+                                                  Inativo
+                                                </Badge>
+                                              )}
+                                              {product.isPaused && (
+                                                <Badge className="bg-amber-100 text-xs text-amber-700 hover:bg-amber-100">
+                                                  Pausado
+                                                </Badge>
+                                              )}
+                                            </div>
+                                            {product.description && (
+                                              <p className="truncate text-xs text-neutral-400">
+                                                {product.description}
+                                              </p>
+                                            )}
+                                          </div>
+                                          <span className="shrink-0 text-sm font-bold text-neutral-900">
+                                            {formatCurrency(product.price)}
+                                          </span>
+                                          <div className="flex shrink-0 items-center gap-1">
+                                            <button
+                                              onClick={() =>
+                                                pauseProduct.mutate({
+                                                  id: product.id,
+                                                  isPaused: !(product.isPaused ?? false),
+                                                })
+                                              }
+                                              className={`rounded-full px-2 py-0.5 text-xs font-medium transition-colors ${(product.isPaused ?? false) ? "bg-amber-100 text-amber-700 hover:bg-amber-200" : "bg-neutral-100 text-neutral-500 hover:bg-amber-50 hover:text-amber-600"}`}
+                                              aria-label={
+                                                (product.isPaused ?? false)
+                                                  ? "Retomar produto"
+                                                  : "Pausar produto (esgotado por agora)"
+                                              }
+                                              title={
+                                                (product.isPaused ?? false)
+                                                  ? "Clique para retomar"
+                                                  : "Pausar — aparece como esgotado no menu"
+                                              }
+                                            >
+                                              {(product.isPaused ?? false) ? (
+                                                <span className="flex items-center gap-1">
+                                                  <Play className="h-3 w-3" aria-hidden="true" />
+                                                  Pausado
+                                                </span>
+                                              ) : (
+                                                <Pause className="h-3 w-3" aria-hidden="true" />
+                                              )}
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                toggleProduct.mutate({
+                                                  id: product.id,
+                                                  isActive: !(product.isActive ?? true),
+                                                })
+                                              }
+                                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${(product.isActive ?? true) ? "bg-emerald-50 text-emerald-700" : "bg-neutral-100 text-neutral-500"}`}
+                                              aria-label={
+                                                (product.isActive ?? true) ? "Desativar" : "Ativar"
+                                              }
+                                            >
+                                              {(product.isActive ?? true) ? "Ativo" : "Inativo"}
+                                            </button>
+                                            <button
+                                              onClick={() =>
+                                                setProductModal({ open: true, editing: product })
+                                              }
+                                              className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100"
+                                              aria-label={`Editar ${product.name}`}
+                                            >
+                                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                                            </button>
+                                            <button
+                                              onClick={() => {
+                                                if (confirm(`Excluir \"${product.name}\"?`))
+                                                  deleteProduct.mutate(product.id);
+                                              }}
+                                              className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-500"
+                                              aria-label={`Excluir ${product.name}`}
+                                            >
+                                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </SortableRow>
+                                  ))}
+                                </SortableContext>
+                              </DndContext>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  </SortableRow>
+                );
+              })}
+            </div>
+          </SortableContext>
+        </DndContext>
       )}
 
       {categoryModal.open && (
