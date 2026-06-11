@@ -174,7 +174,7 @@ export function InventoryMovementsTable({ restaurantId, itemId, title }: Props) 
                       {Math.abs(m.quantity)} {m.itemUnit}
                     </td>
                     <td className="px-4 py-3 text-right text-neutral-500">
-                      {m.unitCost > 0 ? formatCurrency(Math.round(m.unitCost * 100)) : "—"}
+                      {m.unitCost > 0 ? formatCurrency(m.unitCost) : "—"}
                     </td>
                     <td className="px-4 py-3 text-neutral-700">{m.reason ?? "—"}</td>
                     <td className="px-4 py-3 text-neutral-500">{m.userName}</td>

@@ -349,9 +349,7 @@ export function DeliveryZonesClient({
                       <tr key={z.id} className="border-b border-neutral-50 hover:bg-neutral-50">
                         <td className="px-4 py-3 font-medium text-neutral-900">{z.name}</td>
                         <td className="px-4 py-3 text-right text-neutral-700">
-                          {Number(z.fee) === 0
-                            ? "Grátis"
-                            : formatCurrency(Math.round(Number(z.fee) * 100))}
+                          {Number(z.fee) === 0 ? "Grátis" : formatCurrency(Number(z.fee))}
                         </td>
                         <td className="px-4 py-3 text-right text-neutral-500">
                           {z.estimatedMinutes} min

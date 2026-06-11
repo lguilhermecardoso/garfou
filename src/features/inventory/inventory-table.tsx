@@ -67,7 +67,7 @@ export function InventoryTable({ items, restaurantId }: Props) {
                     </td>
                     <td className="px-4 py-3 text-right text-neutral-500">
                       {Number(item.averageCost) > 0
-                        ? formatCurrency(Math.round(Number(item.averageCost) * 100))
+                        ? formatCurrency(Number(item.averageCost))
                         : "—"}
                     </td>
                     <td className="px-4 py-3 text-center">

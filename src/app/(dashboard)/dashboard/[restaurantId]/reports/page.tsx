@@ -360,7 +360,7 @@ export default async function ReportsPage({ params, searchParams }: Props) {
                   <td className="px-4 py-3 font-medium text-neutral-900">{p.name}</td>
                   <td className="px-4 py-3 text-right text-neutral-700">{p.qty}</td>
                   <td className="px-4 py-3 text-right font-semibold text-neutral-900">
-                    {formatCurrency(Math.round(p.revenue * 100))}
+                    {formatCurrency(p.revenue)}
                   </td>
                 </tr>
               ))
