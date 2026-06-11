@@ -16,6 +16,8 @@ export const orderRepository = {
 
     const where: Prisma.OrderWhereInput = {
       restaurantId,
+      // Exclude Stripe orders that haven't been paid yet — they shouldn't enter the kitchen queue
+      NOT: { stripePaymentIntentId: { not: null }, paymentStatus: "PENDING" },
       ...(status && {
         status: Array.isArray(status) ? { in: status } : status,
       }),

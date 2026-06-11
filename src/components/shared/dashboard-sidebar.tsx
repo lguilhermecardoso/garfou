@@ -20,6 +20,7 @@ import {
   MessageCircle,
   Flame,
   Table2,
+  Wallet,
 } from "lucide-react";
 import type { UserRole } from "@/lib/roles";
 import type { MenuItem } from "@/lib/menu-permissions";
@@ -84,6 +85,12 @@ const navItems: MenuItem[] = [
     label: "Financeiro",
     icon: DollarSign,
     allowedRoles: ["OWNER", "MANAGER", "CASHIER"],
+  },
+  {
+    href: "/wallet",
+    label: "Carteira Online",
+    icon: Wallet,
+    allowedRoles: ["OWNER", "MANAGER"],
   },
   {
     href: "/customers",
