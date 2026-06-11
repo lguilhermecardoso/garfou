@@ -264,9 +264,120 @@ export function buildReceiptLines(order: PrintOrder): string[] {
  * The receipt content is injected into a hidden <iframe> so it doesn't
  * affect the current page layout.
  */
+function buildReceiptHTML(order: PrintOrder): string {
+  const e = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const createdAt = new Date(order.createdAt);
+  const dateStr = createdAt.toLocaleDateString("pt-BR");
+  const timeStr = createdAt.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+
+  const divider = (char = "─") =>
+    char === "═" ? `<div class="div div-double"></div>` : `<div class="div div-single"></div>`;
+  const normal = (text: string) => `<div>${e(text)}</div>`;
+  const bold = (text: string) => `<div class="b">${e(text)}</div>`;
+  const ctr = (text: string) => `<div class="ctr">${e(text)}</div>`;
+  const ctrBold = (text: string) => `<div class="ctr b">${e(text)}</div>`;
+  const row = (left: string, right: string, isBold = false) =>
+    `<div class="row${isBold ? " b" : ""}"><span>${e(left)}</span><span>${e(right)}</span></div>`;
+
+  let html = "";
+
+  html += divider("═");
+  html += ctr("chamou.delivery");
+  html += ctr("Sistema de Gestao de Pedidos");
+  html += divider();
+  html += ctrBold(`PEDIDO #${order.orderNumber}`);
+  html += ctrBold(`*** ${TYPE_LABELS[order.type] ?? order.type} ***`);
+
+  let customerLabel = "";
+  if (order.tableNumber) customerLabel = `MESA ${order.tableNumber}`;
+  else if (order.customer?.name) customerLabel = order.customer.name;
+  else if (order.tab?.guestCustomerName) customerLabel = order.tab.guestCustomerName;
+  if (customerLabel) html += ctrBold(customerLabel);
+
+  html += divider();
+  html += row(`Data: ${dateStr}`, `Hora: ${timeStr}`);
+
+  // Customer info
+  if (order.customer) {
+    html += divider();
+    html += bold(`CLIENTE: ${order.customer.name}`);
+    if (order.customer.phone) html += normal(`TELEFONE: ${order.customer.phone}`);
+  }
+
+  // Delivery address
+  if (order.type === "DELIVERY" && order.deliveryAddress) {
+    const addr = order.deliveryAddress;
+    html += divider();
+    if (addr.street && addr.number) html += bold(`ENDERECO: ${addr.street}, ${addr.number}`);
+    if (addr.district) html += bold(`BAIRRO: ${addr.district}`);
+    if (addr.city) html += bold(`CIDADE: ${addr.city}${addr.state ? "/" + addr.state : ""}`);
+  }
+
+  html += divider();
+  html += ctr("ITENS");
+  html += divider();
+
+  for (const item of order.items) {
+    const itemTotal = item.unitPrice * item.quantity;
+    html += row(`${item.quantity}x ${item.product.name}`, formatCurrency(itemTotal), true);
+    html += normal(`   Un: ${formatCurrency(item.unitPrice)}`);
+    if (item.splits?.length) {
+      const den = item.splits.length;
+      for (const split of item.splits) {
+        html += normal(`  1/${den} ${split.productName}`);
+      }
+    }
+    if (item.selectedOptions?.length) {
+      for (const sel of item.selectedOptions) {
+        const prefix = sel.isRemoval ? "  - " : "  + ";
+        const price = sel.isRemoval ? "" : `  ${formatCurrency(sel.unitPrice * sel.quantity)}`;
+        html += normal(`${prefix}${sel.quantity}x ${sel.optionName}${price}`);
+      }
+    }
+    if (item.notes) html += normal(`* ${item.notes}`);
+    if (item.addons?.length) {
+      for (const addon of item.addons) {
+        html += normal(
+          `  + ${addon.quantity}x ${addon.name}  ${formatCurrency(addon.unitPrice * addon.quantity)}`
+        );
+      }
+    }
+  }
+
+  html += divider();
+
+  if (order.discount > 0) {
+    html += row("Subtotal:", formatCurrency(order.subtotal));
+    html += row("Desconto:", `-${formatCurrency(order.discount)}`);
+  }
+  if (order.deliveryFee > 0) {
+    html += row("Taxa de entrega:", formatCurrency(order.deliveryFee));
+  }
+
+  html += divider();
+  html += row("TOTAL:", formatCurrency(order.total), true);
+  html += row(
+    "Pagamento:",
+    PAYMENT_LABELS[order.paymentMethod ?? ""] ?? order.paymentMethod ?? "—"
+  );
+  html += divider();
+
+  if (order.notes) {
+    html += ctr("OBSERVACOES");
+    html += bold(order.notes);
+    html += divider();
+  }
+
+  html += ctr("Obrigado pela preferencia!");
+  html += ctr("www.chamou.delivery");
+  html += divider("═");
+
+  return html;
+}
+
 export function printOrder(order: PrintOrder): void {
-  const lines = buildReceiptLines(order);
-  const escaped = lines.map((l) => l.replace(/&/g, "&amp;").replace(/</g, "&lt;")).join("\n");
+  const body = buildReceiptHTML(order);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -278,18 +389,26 @@ export function printOrder(order: PrintOrder): void {
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 9.5pt;
-    font-weight: 500;
+    font-size: 8.5pt;
+    font-weight: 400;
     line-height: 1.4;
     color: #000;
     background: #fff;
-    white-space: pre;
     width: 54mm;
-    -webkit-font-smoothing: none;
+    word-break: break-word;
   }
+  div { white-space: pre-wrap; }
+  .b { font-weight: 700; }
+  .ctr { text-align: center; }
+  .div { width: 100%; margin: 1px 0; }
+  .div-single { border-bottom: 1px solid #000; }
+  .div-double { border-bottom: 3px double #000; }
+  .row { display: flex; justify-content: space-between; }
+  .row span:first-child { flex: 1; margin-right: 4px; }
+  .row span:last-child { flex-shrink: 0; }
 </style>
 </head>
-<body>${escaped}</body>
+<body>${body}</body>
 </html>`;
 
   // Create hidden iframe
@@ -327,7 +446,7 @@ interface Props {
  * Suitable for display inside a modal.
  */
 export function OrderPrintReceipt({ order, className = "" }: Props) {
-  const lines = buildReceiptLines(order);
+  const body = buildReceiptHTML(order);
 
   return (
     <div
@@ -335,16 +454,25 @@ export function OrderPrintReceipt({ order, className = "" }: Props) {
       style={{
         fontFamily: "'Courier New', Courier, monospace",
         fontSize: "13px",
-        fontWeight: 500,
         lineHeight: "1.5",
-        whiteSpace: "pre",
         overflowX: "auto",
         maxHeight: "60vh",
         overflowY: "auto",
       }}
       aria-label={`Cupom do pedido #${order.orderNumber}`}
     >
-      {lines.join("\n")}
+      <style>{`
+        .receipt-preview div { white-space: pre-wrap; word-break: break-word; }
+        .receipt-preview .b { font-weight: 700; }
+        .receipt-preview .ctr { text-align: center; }
+        .receipt-preview .div { width: 100%; margin: 1px 0; }
+        .receipt-preview .div-single { border-bottom: 1px solid #000; }
+        .receipt-preview .div-double { border-bottom: 3px double #000; }
+        .receipt-preview .row { display: flex; justify-content: space-between; }
+        .receipt-preview .row span:first-child { flex: 1; margin-right: 4px; }
+        .receipt-preview .row span:last-child { flex-shrink: 0; }
+      `}</style>
+      <div className="receipt-preview" dangerouslySetInnerHTML={{ __html: body }} />
     </div>
   );
 }
