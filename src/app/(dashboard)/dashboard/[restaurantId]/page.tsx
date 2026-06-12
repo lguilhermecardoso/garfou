@@ -6,6 +6,8 @@ import { formatCurrency } from "@/lib/utils";
 import { DashboardPendingOrders } from "@/features/orders/dashboard-pending-orders";
 import DeviceTokensManager from "@/features/devices/device-tokens-manager";
 import { ShoppingBag, TrendingUp, Clock, XCircle, DollarSign } from "lucide-react";
+import { startOfDayBRT } from "@/lib/utils";
+import { DailyClosureButton } from "@/features/orders/daily-closure-button";
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
@@ -17,8 +19,7 @@ export default async function DashboardPage({ params }: Props) {
 
   const { restaurantId } = await params;
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = startOfDayBRT();
 
   const [todayOrders, pendingOrders, newOrdersCount] = await Promise.all([
     prisma.order.findMany({
@@ -127,6 +128,9 @@ export default async function DashboardPage({ params }: Props) {
           </Card>
         ))}
       </div>
+
+      {/* Daily closure print */}
+      <DailyClosureButton restaurantId={restaurantId} />
     </div>
   );
 }

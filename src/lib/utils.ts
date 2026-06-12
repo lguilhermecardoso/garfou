@@ -48,6 +48,22 @@ export function getOrderStatusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
+/**
+ * Returns the start of the current day in BRT (UTC-3).
+ * Vercel/servers run on UTC; without this, "today" on the server
+ * drifts 3 hours behind the restaurant's local time.
+ */
+export function startOfDayBRT(date: Date = new Date()): Date {
+  // Shift date to BRT perspective, floor to midnight, shift back to UTC
+  const BRT_OFFSET_MS = -3 * 60 * 60 * 1000; // UTC-3
+  const brtMs = date.getTime() + BRT_OFFSET_MS;
+  const brtDate = new Date(brtMs);
+  // Midnight BRT = start of that UTC date minus the offset → + 3h in UTC
+  return new Date(
+    Date.UTC(brtDate.getUTCFullYear(), brtDate.getUTCMonth(), brtDate.getUTCDate()) - BRT_OFFSET_MS
+  );
+}
+
 export function getOrderStatusColor(status: string): string {
   const colors: Record<string, string> = {
     NOVO_PEDIDO: "bg-blue-100 text-blue-800",
