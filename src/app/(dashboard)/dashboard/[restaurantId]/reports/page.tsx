@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, startOfDayBRT, toBRTDateStr, brtDateStrToUTC } from "@/lib/utils";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BarChart3, TrendingUp, ShoppingBag, Users, Star } from "lucide-react";
@@ -20,33 +20,22 @@ interface Props {
 }
 
 function getPeriodDates(period: Period): { from: Date; label: string } {
-  const now = new Date();
+  const todayBRT = startOfDayBRT();
   if (period === "7d") {
-    const from = new Date(now);
-    from.setDate(from.getDate() - 6);
-    from.setHours(0, 0, 0, 0);
+    const from = new Date(todayBRT);
+    from.setUTCDate(from.getUTCDate() - 6);
     return { from, label: "últimos 7 dias" };
   }
   if (period === "3m") {
-    const from = new Date(now);
-    from.setMonth(from.getMonth() - 3);
-    from.setDate(1);
-    from.setHours(0, 0, 0, 0);
+    const from = new Date(todayBRT);
+    from.setUTCMonth(from.getUTCMonth() - 3);
+    from.setUTCDate(1);
     return { from, label: "últimos 3 meses" };
   }
   // 30d (default)
-  const from = new Date(now);
-  from.setDate(from.getDate() - 29);
-  from.setHours(0, 0, 0, 0);
+  const from = new Date(todayBRT);
+  from.setUTCDate(from.getUTCDate() - 29);
   return { from, label: "últimos 30 dias" };
-}
-
-/** Format a JS Date to YYYY-MM-DD string in local time */
-function toLocalDateStr(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
 }
 
 /** Format to short label: e.g. "01/05" */
@@ -65,9 +54,13 @@ export default async function ReportsPage({ params, searchParams }: Props) {
     rawPeriod === "7d" || rawPeriod === "30d" || rawPeriod === "3m" ? rawPeriod : "30d";
 
   const now = new Date();
-  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const endOfLastMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+  // Use BRT-aware month boundaries: first day of month at midnight BRT
+  const todayBRT = startOfDayBRT(now);
+  const startOfMonth = new Date(todayBRT);
+  startOfMonth.setUTCDate(1); // first day of current BRT month (still correct in UTC)
+  const startOfLastMonth = new Date(startOfMonth);
+  startOfLastMonth.setUTCMonth(startOfLastMonth.getUTCMonth() - 1);
+  const endOfLastMonth = new Date(startOfMonth); // = start of this month = exclusive end of last month
 
   // Custom date range overrides period preset for charts
   let periodFrom: Date;
@@ -75,8 +68,9 @@ export default async function ReportsPage({ params, searchParams }: Props) {
   let customRangeActive = false;
 
   if (rawFrom && rawTo) {
-    periodFrom = new Date(rawFrom + "T00:00:00");
-    periodTo = new Date(rawTo + "T23:59:59");
+    // Parse user-selected dates as BRT midnight / end-of-day
+    periodFrom = brtDateStrToUTC(rawFrom);
+    periodTo = new Date(rawTo + "T23:59:59-03:00");
     customRangeActive = true;
   } else {
     periodFrom = getPeriodDates(period).from;
@@ -130,24 +124,23 @@ export default async function ReportsPage({ params, searchParams }: Props) {
       }),
     ]);
 
-  // Aggregate orders by day for charts
+  // Aggregate orders by BRT day for charts
   const revenueByDay = new Map<string, number>();
   const countByDay = new Map<string, number>();
 
-  // Pre-fill all days in the period with 0
-  const cursor = new Date(periodFrom);
-  cursor.setHours(0, 0, 0, 0);
-  const periodToMidnight = new Date(periodTo);
-  periodToMidnight.setHours(0, 0, 0, 0);
-  while (cursor <= periodToMidnight) {
-    const key = toLocalDateStr(cursor);
+  // Pre-fill all days in the period with 0 (step by UTC day = 24h)
+  const cursor = startOfDayBRT(periodFrom);
+  const periodToDay = startOfDayBRT(periodTo);
+  while (cursor <= periodToDay) {
+    const key = toBRTDateStr(cursor);
     revenueByDay.set(key, 0);
     countByDay.set(key, 0);
-    cursor.setDate(cursor.getDate() + 1);
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   for (const order of periodOrders) {
-    const key = toLocalDateStr(new Date(order.createdAt));
+    // Group by BRT date of the order
+    const key = toBRTDateStr(new Date(order.createdAt));
     revenueByDay.set(key, (revenueByDay.get(key) ?? 0) + Number(order.total));
     countByDay.set(key, (countByDay.get(key) ?? 0) + 1);
   }

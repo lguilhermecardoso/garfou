@@ -21,7 +21,19 @@ export function formatDate(date: Date | string): string {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: "America/Sao_Paulo",
   }).format(d);
+}
+
+/** Returns YYYY-MM-DD in BRT for a given UTC Date (for grouping by day in reports). */
+export function toBRTDateStr(date: Date): string {
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "America/Sao_Paulo" }).format(date);
+}
+
+/** Parses a YYYY-MM-DD string as the start of that day in BRT, returns a UTC Date. */
+export function brtDateStrToUTC(dateStr: string): Date {
+  // "2026-06-11T00:00:00" interpreted as BRT (UTC-3) = "2026-06-11T03:00:00Z"
+  return new Date(dateStr + "T00:00:00-03:00");
 }
 
 export function generateSlug(name: string): string {

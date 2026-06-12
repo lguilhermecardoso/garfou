@@ -27,8 +27,17 @@ export async function GET(req: NextRequest, { params }: Params) {
   const { searchParams } = new URL(req.url);
   const fromStr = searchParams.get("from");
   const toStr = searchParams.get("to");
-  const from = fromStr ? new Date(fromStr) : undefined;
-  const to = toStr ? new Date(toStr) : undefined;
+  // Treat date strings (YYYY-MM-DD) as BRT midnight; ISO strings pass through as-is
+  const from = fromStr
+    ? /^\d{4}-\d{2}-\d{2}$/.test(fromStr)
+      ? new Date(fromStr + "T00:00:00-03:00")
+      : new Date(fromStr)
+    : undefined;
+  const to = toStr
+    ? /^\d{4}-\d{2}-\d{2}$/.test(toStr)
+      ? new Date(toStr + "T23:59:59-03:00")
+      : new Date(toStr)
+    : undefined;
 
   // All Stripe-confirmed orders (paymentStatus = PAID and stripePaymentIntentId set)
   const orders = await prisma.order.findMany({

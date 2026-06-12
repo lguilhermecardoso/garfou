@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, startOfDayBRT, brtDateStrToUTC } from "@/lib/utils";
 import type { Metadata } from "next";
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { DateRangeFilter } from "@/features/finance/date-range-filter";
@@ -28,14 +28,24 @@ export default async function FinancePage({ params, searchParams }: Props) {
   let periodLabel: string;
 
   if (rawFrom && rawTo) {
-    startDate = new Date(rawFrom + "T00:00:00");
-    endDate = new Date(rawTo + "T23:59:59");
-    // Build a readable label
-    const fmt = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+    startDate = brtDateStrToUTC(rawFrom);
+    endDate = new Date(rawTo + "T23:59:59-03:00");
+    const fmt = (d: Date) =>
+      d.toLocaleDateString("pt-BR", {
+        day: "2-digit",
+        month: "short",
+        timeZone: "America/Sao_Paulo",
+      });
     periodLabel = rawFrom === rawTo ? fmt(startDate) : `${fmt(startDate)} – ${fmt(endDate)}`;
   } else {
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    // First day of current BRT month
+    const todayBRT = startOfDayBRT(now);
+    startDate = new Date(todayBRT);
+    startDate.setUTCDate(1);
+    // Last moment of last BRT day of month = first of next month minus 1ms
+    endDate = new Date(startDate);
+    endDate.setUTCMonth(endDate.getUTCMonth() + 1);
+    endDate = new Date(endDate.getTime() - 1);
     periodLabel = "mês atual";
   }
 
