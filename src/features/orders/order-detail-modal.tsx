@@ -351,8 +351,8 @@ export function OrderDetailModal({ orderId, restaurantId, onClose, onStatusChang
                 </button>
               )}
 
-              {/* Finalize — for ready non-delivery orders or out for delivery */}
-              {((isReady && !isDelivery) || isOutForDelivery) && (
+              {/* Finalize — for confirmed, ready non-delivery orders, or out for delivery */}
+              {(order?.status === "CONFIRMADO" || (isReady && !isDelivery) || isOutForDelivery) && (
                 <button
                   onClick={() => patchStatus("FINALIZADO", "finalize")}
                   disabled={!!actioning}

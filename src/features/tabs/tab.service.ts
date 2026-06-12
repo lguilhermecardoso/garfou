@@ -71,6 +71,19 @@ export class TabService {
       throw new Error("Comanda não está aberta");
     }
 
+    // Ensure tab.total reflects all current orders before reading it in close()
+    await this.tabRepository.updateTotal(restaurantId, tabId);
+
+    // Mark all non-cancelled, non-finalized orders as FINALIZADO
+    await prisma.order.updateMany({
+      where: {
+        tabId,
+        restaurantId,
+        status: { notIn: ["FINALIZADO", "CANCELADO"] },
+      },
+      data: { status: "FINALIZADO" },
+    });
+
     // Close tab
     const closedTab = await this.tabRepository.close(restaurantId, tabId, data, userId);
 

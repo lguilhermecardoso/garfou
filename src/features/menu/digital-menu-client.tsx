@@ -283,11 +283,13 @@ export function DigitalMenuClient({
 
   function formatPromoExpiry(expiresAt: string) {
     const d = new Date(expiresAt);
-    const day = d.getDate().toString().padStart(2, "0");
-    const month = (d.getMonth() + 1).toString().padStart(2, "0");
-    const hours = d.getHours().toString().padStart(2, "0");
-    const minutes = d.getMinutes().toString().padStart(2, "0");
-    return `${day}/${month} às ${hours}:${minutes}`;
+    return new Intl.DateTimeFormat("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(d);
   }
 
   const cartTotal = cart.reduce((acc, item) => acc + getCartItemUnitPrice(item) * item.quantity, 0);
