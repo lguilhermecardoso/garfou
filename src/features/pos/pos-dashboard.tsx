@@ -48,6 +48,7 @@ interface TabDetail extends TabListItem {
     orderNumber: number;
     status: string;
     total: number | string;
+    deliveryFee: number | string;
     createdAt: string;
     items: Array<{
       id: string;
@@ -184,6 +185,12 @@ export function PosDashboard({ restaurantId }: Props) {
 
   // ── Tab close calculations ──
   const total = Number(selectedTab?.total ?? 0);
+  // Delivery fee already baked into order.total (and thus tab.total) — extract to show separately
+  const ordersDeliveryFee = (selectedTab?.orders ?? []).reduce(
+    (sum, o) => sum + Number(o.deliveryFee ?? 0),
+    0
+  );
+  const itemsSubtotal = total - ordersDeliveryFee;
   const discountValue = Number(discount || 0);
   const serviceChargeValue = applyServiceCharge ? total * 0.1 : 0;
   const coverChargeAmount = applyCoverCharge ? Number(coverChargeValue || 0) : 0;
@@ -655,9 +662,15 @@ export function PosDashboard({ restaurantId }: Props) {
                   <div className="mt-4 flex items-end justify-between border-t border-neutral-200 pt-4">
                     <div className="flex-1 space-y-1.5 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-neutral-500">Subtotal</span>
-                        <span>{formatCurrency(total)}</span>
+                        <span className="text-neutral-500">Subtotal (itens)</span>
+                        <span>{formatCurrency(itemsSubtotal)}</span>
                       </div>
+                      {ordersDeliveryFee > 0 && (
+                        <div className="flex justify-between text-blue-600">
+                          <span>Taxa de entrega (pedido)</span>
+                          <span>+{formatCurrency(ordersDeliveryFee)}</span>
+                        </div>
+                      )}
                       {discountValue > 0 && (
                         <div className="flex justify-between text-red-600">
                           <span>Desconto</span>
