@@ -170,12 +170,12 @@ export const createOrderSchema = z.object({
   deliveryFee: z.number().min(0).optional(),
   deliveryAddress: z
     .object({
-      street: z.string(),
-      number: z.string(),
+      street: z.string().optional(),
+      number: z.string().optional(),
       complement: z.string().optional(),
-      neighborhood: z.string(),
-      city: z.string(),
-      state: z.string().length(2).optional(),
+      neighborhood: z.string().optional(),
+      city: z.string().optional(),
+      state: z.string().optional(),
       zipCode: z.string().optional(),
     })
     .optional(),

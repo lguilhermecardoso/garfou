@@ -252,17 +252,6 @@ export function PosDashboard({ restaurantId }: Props) {
       toast.error("Adicione pelo menos um item ao pedido");
       return;
     }
-    if (
-      newOrderType === "DELIVERY" &&
-      (!newOrderDeliveryStreet.trim() ||
-        !newOrderDeliveryNumber.trim() ||
-        !newOrderDeliveryNeighborhood.trim() ||
-        !newOrderDeliveryCity.trim())
-    ) {
-      toast.error("Preencha o endereço de entrega completo");
-      return;
-    }
-
     setIsSubmittingNewOrder(true);
     try {
       // 1. Create tab (avulso)
@@ -287,11 +276,11 @@ export function PosDashboard({ restaurantId }: Props) {
           ...(newOrderDeliveryFeeNum > 0 && { deliveryFee: newOrderDeliveryFeeNum }),
           ...(newOrderType === "DELIVERY" && {
             deliveryAddress: {
-              street: newOrderDeliveryStreet.trim(),
-              number: newOrderDeliveryNumber.trim(),
-              district: newOrderDeliveryNeighborhood.trim(),
-              city: newOrderDeliveryCity.trim(),
-              state: newOrderDeliveryState.trim().toUpperCase() || "XX",
+              street: newOrderDeliveryStreet.trim() || undefined,
+              number: newOrderDeliveryNumber.trim() || undefined,
+              neighborhood: newOrderDeliveryNeighborhood.trim() || undefined,
+              city: newOrderDeliveryCity.trim() || undefined,
+              state: newOrderDeliveryState.trim().toUpperCase() || undefined,
             },
           }),
           items: newOrderCart.map((i) => ({

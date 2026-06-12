@@ -300,18 +300,6 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
   async function submitOrder() {
     if (cart.length === 0 || !activeTab) return;
 
-    if (orderMode === "DELIVERY") {
-      if (
-        !deliveryStreet.trim() ||
-        !deliveryNumber.trim() ||
-        !deliveryNeighborhood.trim() ||
-        !deliveryCity.trim()
-      ) {
-        toast.error("Preencha o endereço de entrega completo");
-        return;
-      }
-    }
-
     try {
       const deliveryFeeNum = orderMode === "DELIVERY" ? parseFloat(deliveryFee) || 0 : undefined;
 
@@ -331,12 +319,12 @@ export default function WaiterApp({ restaurantId, tableNumber, bearerToken }: Pr
             ...(orderMode === "DELIVERY" && {
               deliveryFee: deliveryFeeNum,
               deliveryAddress: {
-                street: deliveryStreet.trim(),
-                number: deliveryNumber.trim(),
+                street: deliveryStreet.trim() || undefined,
+                number: deliveryNumber.trim() || undefined,
                 complement: deliveryComplement.trim() || undefined,
-                district: deliveryNeighborhood.trim(),
-                city: deliveryCity.trim(),
-                state: deliveryState.trim().toUpperCase(),
+                neighborhood: deliveryNeighborhood.trim() || undefined,
+                city: deliveryCity.trim() || undefined,
+                state: deliveryState.trim().toUpperCase() || undefined,
               },
             }),
             items: cart.map((i) => ({
