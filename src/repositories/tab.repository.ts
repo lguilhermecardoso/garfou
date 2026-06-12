@@ -20,6 +20,7 @@ export interface CloseTabInput {
   discount?: number;
   serviceCharge?: number;
   coverCharge?: number;
+  deliveryFee?: number;
   notes?: string;
 }
 
@@ -162,6 +163,7 @@ export class TabRepository {
     const discount = new Prisma.Decimal(data.discount ?? 0);
     const serviceCharge = new Prisma.Decimal(data.serviceCharge ?? 0);
     const coverCharge = new Prisma.Decimal(data.coverCharge ?? 0);
+    const deliveryFee = new Prisma.Decimal(data.deliveryFee ?? 0);
 
     // Get current total
     const tab = await prisma.tab.findFirst({
@@ -173,8 +175,12 @@ export class TabRepository {
       throw new Error("Tab not found");
     }
 
-    // Total final = total - desconto + taxa de serviço + couvert
-    const finalTotal = tab.total.minus(discount).plus(serviceCharge).plus(coverCharge);
+    // Total final = total - desconto + taxa de serviço + couvert + entrega
+    const finalTotal = tab.total
+      .minus(discount)
+      .plus(serviceCharge)
+      .plus(coverCharge)
+      .plus(deliveryFee);
 
     return prisma.tab.update({
       where: { id: tabId },

@@ -279,5 +279,6 @@ export const closeTabSchema = z.object({
   discount: z.number().nonnegative().default(0),
   serviceCharge: z.number().nonnegative().default(0),
   coverCharge: z.number().nonnegative().default(0),
+  deliveryFee: z.number().nonnegative().default(0),
   notes: z.string().max(500).optional(),
 });
