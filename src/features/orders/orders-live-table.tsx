@@ -41,6 +41,13 @@ interface Order {
   status: string;
   type: string;
   tableNumber: string | null;
+  deliveryAddress?: {
+    street?: string;
+    number?: string;
+    neighborhood?: string;
+    city?: string;
+    state?: string;
+  } | null;
   total: number;
   createdAt: string;
   items: unknown[];
@@ -200,7 +207,9 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Status</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Tipo</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Cliente</th>
-                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">Mesa</th>
+                    <th className="px-4 py-3 text-left font-semibold text-neutral-600">
+                      Mesa / Endereço
+                    </th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Itens</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Total</th>
                     <th className="px-4 py-3 text-left font-semibold text-neutral-600">Data</th>
@@ -238,7 +247,23 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                           <td className="px-4 py-3 text-neutral-600">
                             {order.customer?.name ?? <span className="text-neutral-400">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-neutral-600">{order.tableNumber ?? "—"}</td>
+                          <td className="px-4 py-3 text-neutral-600">
+                            {order.type === "DELIVERY" && order.deliveryAddress ? (
+                              <span className="text-xs leading-tight">
+                                {[
+                                  order.deliveryAddress.street && order.deliveryAddress.number
+                                    ? `${order.deliveryAddress.street}, ${order.deliveryAddress.number}`
+                                    : order.deliveryAddress.street,
+                                  order.deliveryAddress.neighborhood,
+                                  order.deliveryAddress.city,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")}
+                              </span>
+                            ) : (
+                              (order.tableNumber ?? "—")
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-neutral-600">{order.items.length}</td>
                           <td className="px-4 py-3 font-semibold text-neutral-900">
                             {formatCurrency(order.total)}
