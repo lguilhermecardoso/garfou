@@ -21,6 +21,7 @@ export interface PrintTabOrder {
   createdAt: string | Date;
   status: string;
   total: number;
+  notes?: string | null;
   items: Array<{
     quantity: number;
     product: { name: string };
@@ -210,6 +211,7 @@ export function buildTabReceiptLines(tab: PrintTab, restaurant: PrintRestaurant)
   add(center("RESUMO DE PEDIDOS"), line("─"));
   for (const order of tab.orders) {
     add(leftRight(`Pedido #${order.orderNumber}`, formatCurrency(order.total)));
+    if (order.notes) add(...wrap(`  Obs: ${order.notes}`, 2));
   }
 
   add(line("─"), center("Obrigado pela preferencia!"), center("www.chamou.delivery"), line("═"));

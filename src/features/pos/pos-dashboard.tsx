@@ -49,6 +49,7 @@ interface TabDetail extends TabListItem {
     status: string;
     total: number | string;
     deliveryFee: number | string;
+    notes?: string | null;
     createdAt: string;
     items: Array<{
       id: string;
@@ -123,6 +124,7 @@ export function PosDashboard({ restaurantId }: Props) {
   const [newOrderDeliveryNeighborhood, setNewOrderDeliveryNeighborhood] = useState("");
   const [newOrderDeliveryCity, setNewOrderDeliveryCity] = useState("");
   const [newOrderDeliveryState, setNewOrderDeliveryState] = useState("");
+  const [newOrderNotes, setNewOrderNotes] = useState("");
   const [isSubmittingNewOrder, setIsSubmittingNewOrder] = useState(false);
 
   // ── Queries ──
@@ -251,6 +253,7 @@ export function PosDashboard({ restaurantId }: Props) {
     setNewOrderDeliveryNeighborhood("");
     setNewOrderDeliveryCity("");
     setNewOrderDeliveryState("");
+    setNewOrderNotes("");
     setNewOrderSearch("");
   }
 
@@ -280,6 +283,7 @@ export function PosDashboard({ restaurantId }: Props) {
         body: JSON.stringify({
           type: newOrderType,
           tabId,
+          ...(newOrderNotes.trim() && { notes: newOrderNotes.trim() }),
           ...(newOrderDeliveryFeeNum > 0 && { deliveryFee: newOrderDeliveryFeeNum }),
           ...(newOrderType === "DELIVERY" && {
             deliveryAddress: {
@@ -354,6 +358,7 @@ export function PosDashboard({ restaurantId }: Props) {
             createdAt: order.createdAt,
             status: order.status,
             total: Number(order.total),
+            notes: order.notes ?? null,
             items: order.items.map((item) => ({
               quantity: item.quantity,
               product: { name: item.product.name },
@@ -962,6 +967,20 @@ export function PosDashboard({ restaurantId }: Props) {
                     </div>
                   </div>
                 )}
+
+                {/* Notes */}
+                <div>
+                  <label className="text-xs font-semibold text-neutral-500">
+                    Observações (opcional)
+                  </label>
+                  <textarea
+                    placeholder="Ex.: sem cebola, troco para R$50, campainha não funciona..."
+                    value={newOrderNotes}
+                    onChange={(e) => setNewOrderNotes(e.target.value)}
+                    rows={2}
+                    className="mt-1 w-full resize-none rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-neutral-300 focus:outline-none"
+                  />
+                </div>
 
                 {/* Total + submit */}
                 <div className="space-y-2">
