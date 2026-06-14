@@ -199,14 +199,30 @@ export const orderService = {
       const selectedOptionsTotal = selectedOptionSnapshots.reduce((acc, selection) => {
         return selection.isRemoval ? acc : acc + selection.unitPrice * selection.quantity;
       }, 0);
-      const lineTotal = (itemPrice + addonTotal + selectedOptionsTotal) * item.quantity;
+
+      // Free-form extras added by the PDV operator (not linked to DB addon records)
+      const customAddons = item.customAddons ?? [];
+      const customAddonUnitTotal = customAddons.reduce(
+        (sum, a) => sum + a.unitPrice * (a.quantity ?? 1),
+        0
+      );
+      const customAddonNotes = customAddons
+        .map((a) => {
+          const qty = (a.quantity ?? 1) > 1 ? `${a.quantity}x ` : "";
+          return `+ ${qty}${a.name} R$${a.unitPrice.toFixed(2).replace(".", ",")}`;
+        })
+        .join("\n");
+      const combinedNotes = [item.notes, customAddonNotes].filter(Boolean).join("\n") || undefined;
+
+      const lineTotal =
+        (itemPrice + addonTotal + selectedOptionsTotal + customAddonUnitTotal) * item.quantity;
       subtotal += lineTotal;
 
       return {
         productId: item.productId,
         quantity: item.quantity,
-        unitPrice: itemPrice,
-        notes: item.notes,
+        unitPrice: itemPrice + customAddonUnitTotal,
+        notes: combinedNotes,
         addons: {
           create: addonsInput.map((a) => ({
             addonId: a.addonId,

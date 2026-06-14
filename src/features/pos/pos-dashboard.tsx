@@ -114,8 +114,17 @@ export function PosDashboard({ restaurantId }: Props) {
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
   const [newOrderSearch, setNewOrderSearch] = useState("");
   const [newOrderCart, setNewOrderCart] = useState<
-    { productId: string; name: string; price: number; quantity: number }[]
+    {
+      productId: string;
+      name: string;
+      price: number;
+      quantity: number;
+      customAddons: { name: string; unitPrice: number }[];
+    }[]
   >([]);
+  const [addonInputs, setAddonInputs] = useState<Record<string, { name: string; price: string }>>(
+    {}
+  );
   const [newOrderCustomer, setNewOrderCustomer] = useState("");
   const [newOrderType, setNewOrderType] = useState<"TAKEOUT" | "DELIVERY">("TAKEOUT");
   const [newOrderDeliveryFee, setNewOrderDeliveryFee] = useState("");
@@ -216,7 +225,10 @@ export function PosDashboard({ restaurantId }: Props) {
     : allMenuProducts;
 
   const newOrderCartCount = newOrderCart.reduce((acc, i) => acc + i.quantity, 0);
-  const newOrderSubtotal = newOrderCart.reduce((acc, i) => acc + i.price * i.quantity, 0);
+  const newOrderSubtotal = newOrderCart.reduce((acc, i) => {
+    const addonTotal = i.customAddons.reduce((s, a) => s + a.unitPrice, 0);
+    return acc + (i.price + addonTotal) * i.quantity;
+  }, 0);
   const newOrderDeliveryFeeNum =
     newOrderType === "DELIVERY" ? parseFloat(newOrderDeliveryFee) || 0 : 0;
   const newOrderGrandTotal = newOrderSubtotal + newOrderDeliveryFeeNum;
@@ -230,7 +242,13 @@ export function PosDashboard({ restaurantId }: Props) {
         );
       return [
         ...prev,
-        { productId: product.id, name: product.name, price: product.price, quantity: 1 },
+        {
+          productId: product.id,
+          name: product.name,
+          price: product.price,
+          quantity: 1,
+          customAddons: [],
+        },
       ];
     });
   }
@@ -245,6 +263,7 @@ export function PosDashboard({ restaurantId }: Props) {
 
   function resetNewOrder() {
     setNewOrderCart([]);
+    setAddonInputs({});
     setNewOrderCustomer("");
     setNewOrderType("TAKEOUT");
     setNewOrderDeliveryFee("");
@@ -300,6 +319,11 @@ export function PosDashboard({ restaurantId }: Props) {
             selectedOptions: [],
             splits: [],
             addons: [],
+            customAddons: i.customAddons.map((a) => ({
+              name: a.name,
+              unitPrice: a.unitPrice,
+              quantity: 1,
+            })),
           })),
         }),
       });
@@ -833,45 +857,156 @@ export function PosDashboard({ restaurantId }: Props) {
                     Adicione produtos ao pedido
                   </p>
                 ) : (
-                  newOrderCart.map((item) => (
-                    <div
-                      key={item.productId}
-                      className="flex items-center justify-between gap-3 rounded-xl bg-white p-3 shadow-sm"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-semibold text-neutral-900">
-                          {item.name}
-                        </p>
-                        <p className="text-xs text-neutral-500">
-                          {formatCurrency(item.price)} × {item.quantity}
-                        </p>
+                  newOrderCart.map((item) => {
+                    const addonTotal = item.customAddons.reduce((s, a) => s + a.unitPrice, 0);
+                    const input = addonInputs[item.productId] ?? { name: "", price: "" };
+                    return (
+                      <div
+                        key={item.productId}
+                        className="space-y-2 rounded-xl bg-white p-3 shadow-sm"
+                      >
+                        {/* Item row */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-neutral-900">
+                              {item.name}
+                            </p>
+                            <p className="text-xs text-neutral-500">
+                              {formatCurrency(item.price + addonTotal)} × {item.quantity}
+                              {addonTotal > 0 && (
+                                <span className="ml-1 text-amber-600">
+                                  (+{formatCurrency(addonTotal)} extras)
+                                </span>
+                              )}
+                            </p>
+                          </div>
+                          <div className="flex shrink-0 items-center gap-1.5">
+                            <button
+                              onClick={() => removeFromNewCart(item.productId)}
+                              className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-200"
+                              aria-label={`Remover ${item.name}`}
+                            >
+                              <Minus className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                            <span className="w-5 text-center text-sm font-bold">
+                              {item.quantity}
+                            </span>
+                            <button
+                              onClick={() =>
+                                addToNewCart({
+                                  id: item.productId,
+                                  name: item.name,
+                                  price: item.price,
+                                  isActive: true,
+                                })
+                              }
+                              className="bg-primary-500 flex h-6 w-6 items-center justify-center rounded-full text-white"
+                              aria-label={`Adicionar ${item.name}`}
+                            >
+                              <Plus className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Custom addons list */}
+                        {item.customAddons.length > 0 && (
+                          <ul className="space-y-1 pl-1">
+                            {item.customAddons.map((a, idx) => (
+                              <li
+                                key={idx}
+                                className="flex items-center justify-between text-xs text-neutral-600"
+                              >
+                                <span>+ {a.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-amber-700">
+                                    {formatCurrency(a.unitPrice)}
+                                  </span>
+                                  <button
+                                    onClick={() =>
+                                      setNewOrderCart((prev) =>
+                                        prev.map((i) =>
+                                          i.productId === item.productId
+                                            ? {
+                                                ...i,
+                                                customAddons: i.customAddons.filter(
+                                                  (_, j) => j !== idx
+                                                ),
+                                              }
+                                            : i
+                                        )
+                                      )
+                                    }
+                                    className="text-red-400 hover:text-red-600"
+                                    aria-label="Remover adicional"
+                                  >
+                                    <X className="h-3 w-3" />
+                                  </button>
+                                </div>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+
+                        {/* Add addon inline */}
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            placeholder="Ex: Bacon, Queijo..."
+                            value={input.name}
+                            onChange={(e) =>
+                              setAddonInputs((prev) => ({
+                                ...prev,
+                                [item.productId]: { ...input, name: e.target.value },
+                              }))
+                            }
+                            className="min-w-0 flex-1 rounded-lg border border-neutral-200 px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          />
+                          <input
+                            type="number"
+                            placeholder="R$"
+                            value={input.price}
+                            min="0"
+                            step="0.50"
+                            onChange={(e) =>
+                              setAddonInputs((prev) => ({
+                                ...prev,
+                                [item.productId]: { ...input, price: e.target.value },
+                              }))
+                            }
+                            className="w-16 rounded-lg border border-neutral-200 px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          />
+                          <button
+                            onClick={() => {
+                              const price = parseFloat(input.price) || 0;
+                              if (!input.name.trim() || price < 0) return;
+                              setNewOrderCart((prev) =>
+                                prev.map((i) =>
+                                  i.productId === item.productId
+                                    ? {
+                                        ...i,
+                                        customAddons: [
+                                          ...i.customAddons,
+                                          { name: input.name.trim(), unitPrice: price },
+                                        ],
+                                      }
+                                    : i
+                                )
+                              );
+                              setAddonInputs((prev) => ({
+                                ...prev,
+                                [item.productId]: { name: "", price: "" },
+                              }));
+                            }}
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white disabled:opacity-40"
+                            disabled={!input.name.trim()}
+                            aria-label="Adicionar extra"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex shrink-0 items-center gap-1.5">
-                        <button
-                          onClick={() => removeFromNewCart(item.productId)}
-                          className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-200"
-                          aria-label={`Remover ${item.name}`}
-                        >
-                          <Minus className="h-3 w-3" aria-hidden="true" />
-                        </button>
-                        <span className="w-5 text-center text-sm font-bold">{item.quantity}</span>
-                        <button
-                          onClick={() =>
-                            addToNewCart({
-                              id: item.productId,
-                              name: item.name,
-                              price: item.price,
-                              isActive: true,
-                            })
-                          }
-                          className="bg-primary-500 flex h-6 w-6 items-center justify-center rounded-full text-white"
-                          aria-label={`Adicionar ${item.name}`}
-                        >
-                          <Plus className="h-3 w-3" aria-hidden="true" />
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
 

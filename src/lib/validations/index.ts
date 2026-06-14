@@ -153,6 +153,15 @@ export const orderItemSchema = z.object({
       })
     )
     .default([]),
+  customAddons: z
+    .array(
+      z.object({
+        name: z.string().min(1),
+        unitPrice: z.number().nonnegative(),
+        quantity: z.number().int().positive().default(1),
+      })
+    )
+    .default([]),
 });
 
 export const createOrderSchema = z.object({
