@@ -69,7 +69,7 @@ export interface PrintOrder {
   deliveryAddress?: {
     street?: string;
     number?: string;
-    district?: string;
+    neighborhood?: string;
     city?: string;
     state?: string;
   } | null;
@@ -174,8 +174,8 @@ export function buildReceiptLines(order: PrintOrder): string[] {
     if (addr.street && addr.number) {
       add(...wrap(`ENDERECO: ${addr.street}, ${addr.number}`, 0));
     }
-    if (addr.district) {
-      add(`BAIRRO: ${addr.district}`);
+    if (addr.neighborhood) {
+      add(`BAIRRO: ${addr.neighborhood}`);
     }
     if (addr.city && addr.state) {
       add(`CIDADE: ${addr.city}/${addr.state}`);
@@ -310,7 +310,7 @@ function buildReceiptHTML(order: PrintOrder): string {
     const addr = order.deliveryAddress;
     html += divider();
     if (addr.street && addr.number) html += bold(`ENDERECO: ${addr.street}, ${addr.number}`);
-    if (addr.district) html += bold(`BAIRRO: ${addr.district}`);
+    if (addr.neighborhood) html += bold(`BAIRRO: ${addr.neighborhood}`);
     if (addr.city) html += bold(`CIDADE: ${addr.city}${addr.state ? "/" + addr.state : ""}`);
   }
 

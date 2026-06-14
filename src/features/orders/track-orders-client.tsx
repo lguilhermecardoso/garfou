@@ -269,7 +269,7 @@ export function TrackOrdersClient({ restaurantSlug }: Props) {
                               <p className="mt-1 text-sm text-neutral-600">
                                 {String(order.deliveryAddress.street)},{" "}
                                 {String(order.deliveryAddress.number)} -{" "}
-                                {String(order.deliveryAddress.district)}
+                                {String(order.deliveryAddress.neighborhood)}
                               </p>
                             </div>
                           )}
