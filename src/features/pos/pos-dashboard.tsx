@@ -47,10 +47,18 @@ interface TabDetail extends TabListItem {
     id: string;
     orderNumber: number;
     status: string;
+    type: string;
     total: number | string;
     deliveryFee: number | string;
     notes?: string | null;
     createdAt: string;
+    deliveryAddress?: {
+      street?: string;
+      number?: string;
+      neighborhood?: string;
+      city?: string;
+      state?: string;
+    } | null;
     items: Array<{
       id: string;
       quantity: number;
@@ -372,17 +380,21 @@ export function PosDashboard({ restaurantId }: Props) {
           discount: discountValue,
           serviceCharge: serviceChargeValue,
           coverCharge: coverChargeAmount,
+          deliveryFee: ordersDeliveryFee || undefined,
           finalTotal,
           paymentMethod,
           notes: notes.trim() || null,
           table: selectedTab.table ? { identifier: selectedTab.table.identifier } : null,
           customer: selectedTab.customer || null,
+          guestCustomerName: selectedTab.guestCustomerName ?? null,
           orders: selectedTab.orders.map((order) => ({
             orderNumber: order.orderNumber,
             createdAt: order.createdAt,
             status: order.status,
+            type: order.type,
             total: Number(order.total),
             notes: order.notes ?? null,
+            deliveryAddress: order.deliveryAddress ?? null,
             items: order.items.map((item) => ({
               quantity: item.quantity,
               product: { name: item.product.name },
