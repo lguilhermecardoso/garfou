@@ -115,6 +115,7 @@ export function PosDashboard({ restaurantId }: Props) {
   const [applyDeliveryFee, setApplyDeliveryFee] = useState(false);
   const [deliveryFeeValue, setDeliveryFeeValue] = useState("0");
   const [notes, setNotes] = useState("");
+  const [trocoParaValue, setTrocoParaValue] = useState("");
   const [isClosing, setIsClosing] = useState(false);
   const printConfirmation = usePrintConfirmation();
 
@@ -218,6 +219,8 @@ export function PosDashboard({ restaurantId }: Props) {
     total - discountValue + serviceChargeValue + coverChargeAmount + deliveryFeeAmount,
     0
   );
+  const trocoParaNum = paymentMethod === "CASH" ? parseFloat(trocoParaValue) || 0 : 0;
+  const trocoAmount = trocoParaNum > 0 ? Math.max(0, trocoParaNum - finalTotal) : 0;
   const selectedLabel = selectedTab?.table
     ? `Mesa ${selectedTab.table.identifier}`
     : (selectedTab?.customer?.name ?? selectedTab?.guestCustomerName ?? "Sem comanda");
@@ -384,6 +387,8 @@ export function PosDashboard({ restaurantId }: Props) {
           finalTotal,
           paymentMethod,
           notes: notes.trim() || null,
+          changeFor: trocoParaNum > 0 ? trocoParaNum : undefined,
+          change: trocoAmount > 0 ? trocoAmount : undefined,
           table: selectedTab.table ? { identifier: selectedTab.table.identifier } : null,
           customer: selectedTab.customer || null,
           guestCustomerName: selectedTab.guestCustomerName ?? null,
@@ -425,6 +430,7 @@ export function PosDashboard({ restaurantId }: Props) {
       setApplyDeliveryFee(false);
       setDeliveryFeeValue("0");
       setNotes("");
+      setTrocoParaValue("");
       toast.success("Comanda fechada com sucesso!", {
         description: `Total pago: ${formatCurrency(finalTotal)}`,
       });
@@ -607,6 +613,35 @@ export function PosDashboard({ restaurantId }: Props) {
                     </div>
                   </div>
 
+                  {paymentMethod === "CASH" && (
+                    <div className="mt-3 flex items-end gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                      <div className="flex-1">
+                        <label className="text-sm font-medium text-amber-800">
+                          Troco para (R$)
+                        </label>
+                        <input
+                          type="number"
+                          min={finalTotal}
+                          step="0.50"
+                          value={trocoParaValue}
+                          onChange={(e) => setTrocoParaValue(e.target.value)}
+                          className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                          placeholder={`Ex: ${Math.ceil(finalTotal / 10) * 10},00`}
+                        />
+                      </div>
+                      {trocoParaNum > 0 && (
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs text-amber-700">Troco</p>
+                          <p
+                            className={`text-xl font-bold ${trocoAmount > 0 ? "text-green-700" : "text-red-600"}`}
+                          >
+                            {trocoAmount > 0 ? formatCurrency(trocoAmount) : "Valor insuficiente"}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <div className="mt-3 grid gap-4 md:grid-cols-3">
                     <div className="flex items-start gap-3">
                       <input
@@ -742,6 +777,12 @@ export function PosDashboard({ restaurantId }: Props) {
                           {formatCurrency(finalTotal)}
                         </span>
                       </div>
+                      {trocoAmount > 0 && (
+                        <div className="flex justify-between rounded-lg bg-green-50 px-2 py-1 font-semibold text-green-700">
+                          <span>Troco</span>
+                          <span>{formatCurrency(trocoAmount)}</span>
+                        </div>
+                      )}
                     </div>
                     <Button onClick={closeTab} loading={isClosing} className="ml-6 shrink-0">
                       Confirmar pagamento

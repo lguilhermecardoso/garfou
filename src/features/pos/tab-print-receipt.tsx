@@ -44,6 +44,8 @@ export interface PrintTab {
   deliveryFee?: number;
   finalTotal: number;
   paymentMethod: string;
+  changeFor?: number;
+  change?: number;
   notes?: string | null;
   table?: { identifier: string } | null;
   customer?: { name: string; phone?: string | null } | null;
@@ -177,6 +179,10 @@ function buildTabReceiptHTML(tab: PrintTab, restaurant: PrintRestaurant): string
   html += divider();
   html += row("TOTAL:", formatCurrency(tab.finalTotal), true);
   html += row("Pagamento:", PAYMENT_LABELS[tab.paymentMethod] ?? tab.paymentMethod);
+  if (tab.changeFor && tab.changeFor > 0) {
+    html += row("Troco para:", formatCurrency(tab.changeFor));
+    html += row("TROCO:", formatCurrency(tab.change ?? 0), true);
+  }
   html += divider();
 
   // Tab notes
