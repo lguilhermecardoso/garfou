@@ -143,6 +143,8 @@ export function PosDashboard({ restaurantId }: Props) {
   const [newOrderDeliveryCity, setNewOrderDeliveryCity] = useState("");
   const [newOrderDeliveryState, setNewOrderDeliveryState] = useState("");
   const [newOrderNotes, setNewOrderNotes] = useState("");
+  const [newOrderPaymentMethod, setNewOrderPaymentMethod] = useState<PaymentMethod>("PIX");
+  const [newOrderTrocoParaValue, setNewOrderTrocoParaValue] = useState("");
   const [isSubmittingNewOrder, setIsSubmittingNewOrder] = useState(false);
 
   // ── Queries ──
@@ -243,6 +245,10 @@ export function PosDashboard({ restaurantId }: Props) {
   const newOrderDeliveryFeeNum =
     newOrderType === "DELIVERY" ? parseFloat(newOrderDeliveryFee) || 0 : 0;
   const newOrderGrandTotal = newOrderSubtotal + newOrderDeliveryFeeNum;
+  const newOrderTrocoParaNum =
+    newOrderPaymentMethod === "CASH" ? parseFloat(newOrderTrocoParaValue) || 0 : 0;
+  const newOrderTrocoAmount =
+    newOrderTrocoParaNum > 0 ? Math.max(0, newOrderTrocoParaNum - newOrderGrandTotal) : 0;
 
   function addToNewCart(product: MenuProduct) {
     setNewOrderCart((prev) => {
@@ -284,6 +290,8 @@ export function PosDashboard({ restaurantId }: Props) {
     setNewOrderDeliveryCity("");
     setNewOrderDeliveryState("");
     setNewOrderNotes("");
+    setNewOrderPaymentMethod("PIX");
+    setNewOrderTrocoParaValue("");
     setNewOrderSearch("");
   }
 
@@ -313,7 +321,17 @@ export function PosDashboard({ restaurantId }: Props) {
         body: JSON.stringify({
           type: newOrderType,
           tabId,
-          ...(newOrderNotes.trim() && { notes: newOrderNotes.trim() }),
+          paymentMethod: newOrderPaymentMethod,
+          ...(() => {
+            const parts = [newOrderNotes.trim()];
+            if (newOrderTrocoParaNum > 0) {
+              parts.push(`Troco para: R$${newOrderTrocoParaNum.toFixed(2).replace(".", ",")}`);
+              if (newOrderTrocoAmount > 0)
+                parts.push(`Troco: R$${newOrderTrocoAmount.toFixed(2).replace(".", ",")}`);
+            }
+            const combined = parts.filter(Boolean).join(" | ");
+            return combined ? { notes: combined } : {};
+          })(),
           ...(newOrderDeliveryFeeNum > 0 && { deliveryFee: newOrderDeliveryFeeNum }),
           ...(newOrderType === "DELIVERY" && {
             deliveryAddress: {
@@ -1156,13 +1174,76 @@ export function PosDashboard({ restaurantId }: Props) {
                   </div>
                 )}
 
+                {/* Payment method */}
+                <div>
+                  <p className="mb-2 text-xs font-semibold text-neutral-500">Forma de pagamento</p>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {(
+                      [
+                        ["PIX", "PIX"],
+                        ["CASH", "Dinheiro"],
+                        ["CREDIT_CARD", "Crédito"],
+                        ["DEBIT_CARD", "Débito"],
+                        ["VOUCHER", "Voucher"],
+                      ] as [PaymentMethod, string][]
+                    ).map(([value, label]) => (
+                      <button
+                        key={value}
+                        onClick={() => {
+                          setNewOrderPaymentMethod(value);
+                          if (value !== "CASH") setNewOrderTrocoParaValue("");
+                        }}
+                        className={`rounded-xl border py-2 text-xs font-semibold transition-colors ${
+                          newOrderPaymentMethod === value
+                            ? "border-primary-500 bg-primary-50 text-primary-700"
+                            : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Troco (only for CASH) */}
+                {newOrderPaymentMethod === "CASH" && (
+                  <div className="flex items-end gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                    <div className="flex-1">
+                      <label className="text-xs font-semibold text-amber-800">
+                        Troco para (R$)
+                      </label>
+                      <input
+                        type="number"
+                        min={newOrderGrandTotal}
+                        step="0.50"
+                        value={newOrderTrocoParaValue}
+                        onChange={(e) => setNewOrderTrocoParaValue(e.target.value)}
+                        className="mt-1 w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                        placeholder={`Ex: ${Math.ceil(newOrderGrandTotal / 10) * 10 || 50},00`}
+                      />
+                    </div>
+                    {newOrderTrocoParaNum > 0 && (
+                      <div className="shrink-0 text-right">
+                        <p className="text-xs text-amber-700">Troco</p>
+                        <p
+                          className={`text-xl font-bold ${newOrderTrocoAmount > 0 ? "text-green-700" : "text-red-600"}`}
+                        >
+                          {newOrderTrocoAmount > 0
+                            ? formatCurrency(newOrderTrocoAmount)
+                            : "Insuficiente"}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Notes */}
                 <div>
                   <label className="text-xs font-semibold text-neutral-500">
                     Observações (opcional)
                   </label>
                   <textarea
-                    placeholder="Ex.: sem cebola, troco para R$50, campainha não funciona..."
+                    placeholder="Ex.: sem cebola, campainha não funciona..."
                     value={newOrderNotes}
                     onChange={(e) => setNewOrderNotes(e.target.value)}
                     rows={2}
