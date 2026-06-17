@@ -13,6 +13,7 @@ import {
   Truck,
   MessageCircle,
   ClipboardPlus,
+  Trash2,
 } from "lucide-react";
 import { ManualOrderModal } from "./manual-order-modal";
 
@@ -97,6 +98,7 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
   const [actioning, setActioning] = useState<string | null>(null);
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
   const knownIds = useRef<Set<string>>(new Set());
 
   const fetchOrders = useCallback(async () => {
@@ -230,6 +232,9 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                       const isReady = order.status === "PRONTO";
                       const isOutForDelivery = order.status === "SAIU_PARA_ENTREGA";
                       const isDelivery = order.type === "DELIVERY";
+                      const isCancellable =
+                        !isPending && order.status !== "FINALIZADO" && order.status !== "CANCELADO";
+                      const isConfirmingCancel = confirmingCancelId === order.id;
                       return (
                         <tr
                           key={order.id}
@@ -324,6 +329,39 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
                                   <CheckCheck className="h-4 w-4" />
                                 </button>
                               ) : null}
+                              {/* Cancel for active non-pending orders */}
+                              {isCancellable &&
+                                (isConfirmingCancel ? (
+                                  <>
+                                    <button
+                                      onClick={() => {
+                                        setConfirmingCancelId(null);
+                                        patchStatus(order.id, "CANCELADO");
+                                      }}
+                                      disabled={actioning === order.id}
+                                      title="Confirmar cancelamento"
+                                      className="rounded-lg bg-red-600 px-2 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                      Cancelar?
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmingCancelId(null)}
+                                      title="Não cancelar"
+                                      className="rounded-lg bg-neutral-200 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-300"
+                                    >
+                                      <XCircle className="h-4 w-4" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmingCancelId(order.id)}
+                                    disabled={actioning === order.id}
+                                    title="Cancelar pedido"
+                                    className="rounded-lg bg-red-100 p-1.5 text-red-600 transition-colors hover:bg-red-200 disabled:opacity-50"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                ))}
                               {/* WhatsApp quick-send */}
                               {order.customer?.phone && (
                                 <a
