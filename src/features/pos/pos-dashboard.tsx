@@ -595,8 +595,7 @@ export function PosDashboard({ restaurantId }: Props) {
                   </h3>
                   <div className="space-y-3">
                     {selectedTab.orders.map((order) => {
-                      const isCancellable =
-                        order.status !== "FINALIZADO" && order.status !== "CANCELADO";
+                      const isCancellable = order.status !== "CANCELADO";
                       const isConfirmingCancel = confirmingCancelOrderId === order.id;
                       return (
                         <div key={order.id} className="rounded-2xl border border-neutral-200 p-4">

@@ -320,6 +320,7 @@ export const orderService = {
       EM_PREPARO: ["PRONTO", "CANCELADO"],
       PRONTO: ["SAIU_PARA_ENTREGA", "FINALIZADO", "CANCELADO"],
       SAIU_PARA_ENTREGA: ["FINALIZADO", "CANCELADO"],
+      FINALIZADO: ["CANCELADO"],
     };
 
     const allowed = validTransitions[order.status] ?? [];
