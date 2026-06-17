@@ -20,6 +20,7 @@ import {
   Truck,
   UtensilsCrossed,
   ShoppingCart,
+  Trash2,
 } from "lucide-react";
 import { printTabReceipt, type PrintTab, type PrintRestaurant } from "./tab-print-receipt";
 import { CashRegisterPanel } from "@/features/cash-register/cash-register-panel";
@@ -117,6 +118,8 @@ export function PosDashboard({ restaurantId }: Props) {
   const [notes, setNotes] = useState("");
   const [trocoParaValue, setTrocoParaValue] = useState("");
   const [isClosing, setIsClosing] = useState(false);
+  const [confirmingCancelOrderId, setConfirmingCancelOrderId] = useState<string | null>(null);
+  const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null);
   const printConfirmation = usePrintConfirmation();
 
   // ── New order modal state ──
@@ -371,6 +374,32 @@ export function PosDashboard({ restaurantId }: Props) {
     }
   }
 
+  // ── Cancel order ──
+  async function cancelOrder(orderId: string) {
+    setCancellingOrderId(orderId);
+    try {
+      const res = await fetch(`/api/restaurants/${restaurantId}/orders/${orderId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "CANCELADO" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? "Erro ao cancelar pedido");
+      toast.success("Pedido cancelado", {
+        description: "Não será considerado no financeiro.",
+      });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["pos-tab-detail", restaurantId] }),
+        queryClient.invalidateQueries({ queryKey: ["pos-tabs", restaurantId] }),
+      ]);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erro ao cancelar pedido");
+    } finally {
+      setCancellingOrderId(null);
+      setConfirmingCancelOrderId(null);
+    }
+  }
+
   // ── Close tab ──
   async function closeTab() {
     if (!selectedTabId || !selectedTab || isClosing) return;
@@ -565,31 +594,65 @@ export function PosDashboard({ restaurantId }: Props) {
                     Pedidos da comanda
                   </h3>
                   <div className="space-y-3">
-                    {selectedTab.orders.map((order) => (
-                      <div key={order.id} className="rounded-2xl border border-neutral-200 p-4">
-                        <div className="flex items-center justify-between gap-3">
-                          <div>
-                            <p className="font-semibold text-neutral-900">
-                              Pedido #{order.orderNumber}
-                            </p>
-                            <p className="text-xs text-neutral-500">
-                              {formatDate(order.createdAt)}
-                            </p>
+                    {selectedTab.orders.map((order) => {
+                      const isCancellable =
+                        order.status !== "FINALIZADO" && order.status !== "CANCELADO";
+                      const isConfirmingCancel = confirmingCancelOrderId === order.id;
+                      return (
+                        <div key={order.id} className="rounded-2xl border border-neutral-200 p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-neutral-900">
+                                Pedido #{order.orderNumber}
+                              </p>
+                              <p className="text-xs text-neutral-500">
+                                {formatDate(order.createdAt)}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant="outline">{order.status}</Badge>
+                              {isCancellable &&
+                                (isConfirmingCancel ? (
+                                  <div className="flex items-center gap-1">
+                                    <button
+                                      onClick={() => cancelOrder(order.id)}
+                                      disabled={cancellingOrderId === order.id}
+                                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                    >
+                                      Cancelar?
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmingCancelOrderId(null)}
+                                      className="rounded-lg bg-neutral-200 p-1 text-neutral-600 transition-colors hover:bg-neutral-300"
+                                      aria-label="Não cancelar"
+                                    >
+                                      <X className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => setConfirmingCancelOrderId(order.id)}
+                                    title="Cancelar pedido"
+                                    className="rounded-lg bg-red-100 p-1.5 text-red-600 transition-colors hover:bg-red-200"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                ))}
+                            </div>
                           </div>
-                          <Badge variant="outline">{order.status}</Badge>
+                          <div className="mt-3 space-y-1 text-sm text-neutral-600">
+                            {order.items.map((item) => (
+                              <p key={item.id}>
+                                {item.quantity}x {item.product.name}
+                              </p>
+                            ))}
+                          </div>
+                          <p className="mt-3 text-sm font-semibold text-neutral-900">
+                            {formatCurrency(order.total)}
+                          </p>
                         </div>
-                        <div className="mt-3 space-y-1 text-sm text-neutral-600">
-                          {order.items.map((item) => (
-                            <p key={item.id}>
-                              {item.quantity}x {item.product.name}
-                            </p>
-                          ))}
-                        </div>
-                        <p className="mt-3 text-sm font-semibold text-neutral-900">
-                          {formatCurrency(order.total)}
-                        </p>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
 

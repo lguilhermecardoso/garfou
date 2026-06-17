@@ -337,6 +337,13 @@ export const orderService = {
       await new TabService().recalculateTabTotal(restaurantId, updatedOrder.tab.id);
     }
 
+    // Cancelled orders must not be reflected in finance reports
+    if (input.status === "CANCELADO") {
+      await prisma.financeEntry.deleteMany({
+        where: { restaurantId, orderId },
+      });
+    }
+
     // Auto-create finance entry when order is finalized
     if (input.status === "FINALIZADO") {
       const resolvedUserId = userId ?? order.waiterId ?? order.customerId ?? "system";
