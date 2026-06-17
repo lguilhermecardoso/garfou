@@ -594,65 +594,73 @@ export function PosDashboard({ restaurantId }: Props) {
                     Pedidos da comanda
                   </h3>
                   <div className="space-y-3">
-                    {selectedTab.orders.map((order) => {
-                      const isCancellable = order.status !== "CANCELADO";
-                      const isConfirmingCancel = confirmingCancelOrderId === order.id;
-                      return (
-                        <div key={order.id} className="rounded-2xl border border-neutral-200 p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <p className="font-semibold text-neutral-900">
-                                Pedido #{order.orderNumber}
-                              </p>
-                              <p className="text-xs text-neutral-500">
-                                {formatDate(order.createdAt)}
-                              </p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline">{order.status}</Badge>
-                              {isCancellable &&
-                                (isConfirmingCancel ? (
-                                  <div className="flex items-center gap-1">
+                    {selectedTab.orders
+                      .filter((order) => order.status !== "CANCELADO")
+                      .map((order) => {
+                        const isCancellable = order.status !== "CANCELADO";
+                        const isConfirmingCancel = confirmingCancelOrderId === order.id;
+                        return (
+                          <div key={order.id} className="rounded-2xl border border-neutral-200 p-4">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <p className="font-semibold text-neutral-900">
+                                  Pedido #{order.orderNumber}
+                                </p>
+                                <p className="text-xs text-neutral-500">
+                                  {formatDate(order.createdAt)}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline">{order.status}</Badge>
+                                {isCancellable &&
+                                  (isConfirmingCancel ? (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        onClick={() => cancelOrder(order.id)}
+                                        disabled={cancellingOrderId === order.id}
+                                        className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                      >
+                                        Cancelar?
+                                      </button>
+                                      <button
+                                        onClick={() => setConfirmingCancelOrderId(null)}
+                                        className="rounded-lg bg-neutral-200 p-1 text-neutral-600 transition-colors hover:bg-neutral-300"
+                                        aria-label="Não cancelar"
+                                      >
+                                        <X className="h-3.5 w-3.5" />
+                                      </button>
+                                    </div>
+                                  ) : (
                                     <button
-                                      onClick={() => cancelOrder(order.id)}
-                                      disabled={cancellingOrderId === order.id}
-                                      className="rounded-lg bg-red-600 px-2 py-1 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:opacity-50"
+                                      onClick={() => setConfirmingCancelOrderId(order.id)}
+                                      title="Cancelar pedido"
+                                      className="rounded-lg bg-red-100 p-1.5 text-red-600 transition-colors hover:bg-red-200"
                                     >
-                                      Cancelar?
+                                      <Trash2 className="h-3.5 w-3.5" />
                                     </button>
-                                    <button
-                                      onClick={() => setConfirmingCancelOrderId(null)}
-                                      className="rounded-lg bg-neutral-200 p-1 text-neutral-600 transition-colors hover:bg-neutral-300"
-                                      aria-label="Não cancelar"
-                                    >
-                                      <X className="h-3.5 w-3.5" />
-                                    </button>
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => setConfirmingCancelOrderId(order.id)}
-                                    title="Cancelar pedido"
-                                    className="rounded-lg bg-red-100 p-1.5 text-red-600 transition-colors hover:bg-red-200"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                ))}
+                                  ))}
+                              </div>
                             </div>
+                            <div className="mt-3 space-y-1 text-sm text-neutral-600">
+                              {order.items.map((item) => (
+                                <p key={item.id}>
+                                  {item.quantity}x {item.product.name}
+                                </p>
+                              ))}
+                            </div>
+                            <p className="mt-3 text-sm font-semibold text-neutral-900">
+                              {formatCurrency(order.total)}
+                            </p>
                           </div>
-                          <div className="mt-3 space-y-1 text-sm text-neutral-600">
-                            {order.items.map((item) => (
-                              <p key={item.id}>
-                                {item.quantity}x {item.product.name}
-                              </p>
-                            ))}
-                          </div>
-                          <p className="mt-3 text-sm font-semibold text-neutral-900">
-                            {formatCurrency(order.total)}
-                          </p>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
                   </div>
+                  {selectedTab.orders.some((order) => order.status === "CANCELADO") && (
+                    <p className="mt-2 text-xs text-neutral-400">
+                      {selectedTab.orders.filter((order) => order.status === "CANCELADO").length}{" "}
+                      pedido(s) cancelado(s) nesta comanda (não contam no total)
+                    </p>
+                  )}
                 </div>
 
                 <div className="rounded-2xl border border-neutral-200 bg-neutral-50 p-4">
