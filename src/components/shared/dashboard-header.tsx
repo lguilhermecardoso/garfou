@@ -19,9 +19,10 @@ interface Restaurant {
 interface Props {
   restaurantId: string;
   user: { name?: string | null; email?: string | null; image?: string | null };
+  onMenuClick?: () => void;
 }
 
-export function DashboardHeader({ restaurantId, user }: Props) {
+export function DashboardHeader({ restaurantId, user, onMenuClick }: Props) {
   const router = useRouter();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showRestaurants, setShowRestaurants] = useState(false);
@@ -94,6 +95,7 @@ export function DashboardHeader({ restaurantId, user }: Props) {
     <header className="relative flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
       {/* Mobile menu button — sidebar toggle */}
       <button
+        onClick={onMenuClick}
         className="rounded-lg p-2 text-neutral-600 hover:bg-neutral-100 lg:hidden"
         aria-label="Abrir menu"
       >

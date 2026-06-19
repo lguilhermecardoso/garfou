@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
@@ -21,6 +22,7 @@ import {
   Flame,
   Table2,
   Wallet,
+  X,
 } from "lucide-react";
 import type { UserRole } from "@/lib/roles";
 import type { MenuItem } from "@/lib/menu-permissions";
@@ -29,6 +31,8 @@ import { filterMenuByRole } from "@/lib/menu-permissions";
 interface Props {
   restaurantId: string;
   userRole: UserRole;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 const navItems: MenuItem[] = [
@@ -142,57 +146,101 @@ const navItems: MenuItem[] = [
   },
 ];
 
-export function DashboardSidebar({ restaurantId, userRole }: Props) {
+export function DashboardSidebar({
+  restaurantId,
+  userRole,
+  mobileOpen = false,
+  onMobileClose,
+}: Props) {
   const pathname = usePathname();
   const base = `/dashboard/${restaurantId}`;
 
   // Filtra os itens do menu baseado na role do usuário
   const visibleItems = filterMenuByRole(navItems, userRole);
 
+  // Close drawer on route change and lock body scroll while open (mobile)
+  useEffect(() => {
+    onMobileClose?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [mobileOpen]);
+
   return (
-    <aside
-      className="hidden w-56 shrink-0 border-r border-neutral-200 bg-white lg:flex lg:flex-col"
-      aria-label="Navegação lateral"
-    >
-      {/* Logo */}
-      <div className="flex items-center gap-2 border-b border-neutral-100 px-4 py-4">
-        <Flame className="text-primary-500 h-6 w-6" aria-hidden="true" />
-        <span className="text-lg font-bold text-neutral-900">chamou.delivery</span>
-      </div>
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={onMobileClose}
+          aria-hidden="true"
+        />
+      )}
 
-      {/* Nav */}
-      <nav className="flex-1 overflow-y-auto px-2 py-3">
-        <ul className="space-y-0.5" role="list">
-          {visibleItems.map((item) => {
-            const href = `${base}${item.href}`;
-            const isActive = item.href === "" ? pathname === base : pathname.startsWith(href);
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-neutral-200 bg-white transition-transform duration-200 ease-in-out",
+          "lg:static lg:z-auto lg:w-56 lg:shrink-0 lg:translate-x-0",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+        aria-label="Navegação lateral"
+      >
+        {/* Logo */}
+        <div className="flex items-center justify-between gap-2 border-b border-neutral-100 px-4 py-4">
+          <div className="flex items-center gap-2">
+            <Flame className="text-primary-500 h-6 w-6" aria-hidden="true" />
+            <span className="text-lg font-bold text-neutral-900">chamou.delivery</span>
+          </div>
+          <button
+            onClick={onMobileClose}
+            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 lg:hidden"
+            aria-label="Fechar menu"
+          >
+            <X className="h-5 w-5" aria-hidden="true" />
+          </button>
+        </div>
 
-            return (
-              <li key={item.href}>
-                <Link
-                  href={href}
-                  className={cn(
-                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                    isActive
-                      ? "bg-primary-50 text-primary-600"
-                      : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
-                  )}
-                  aria-current={isActive ? "page" : undefined}
-                >
-                  <item.icon
+        {/* Nav */}
+        <nav className="flex-1 overflow-y-auto px-2 py-3">
+          <ul className="space-y-0.5" role="list">
+            {visibleItems.map((item) => {
+              const href = `${base}${item.href}`;
+              const isActive = item.href === "" ? pathname === base : pathname.startsWith(href);
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={href}
                     className={cn(
-                      "h-4 w-4 shrink-0",
-                      isActive ? "text-primary-500" : "text-neutral-400"
+                      "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary-50 text-primary-600"
+                        : "text-neutral-600 hover:bg-neutral-50 hover:text-neutral-900"
                     )}
-                    aria-hidden="true"
-                  />
-                  {item.label}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
-    </aside>
+                    aria-current={isActive ? "page" : undefined}
+                  >
+                    <item.icon
+                      className={cn(
+                        "h-4 w-4 shrink-0",
+                        isActive ? "text-primary-500" : "text-neutral-400"
+                      )}
+                      aria-hidden="true"
+                    />
+                    {item.label}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+      </aside>
+    </>
   );
 }

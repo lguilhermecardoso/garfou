@@ -1,7 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
-import { DashboardSidebar } from "@/components/shared/dashboard-sidebar";
-import { DashboardHeader } from "@/components/shared/dashboard-header";
+import { DashboardShell } from "@/components/shared/dashboard-shell";
 import { NewOrderAlertProvider } from "@/components/shared/new-order-alert-provider";
 import { getRestaurantMembership } from "@/lib/rbac";
 
@@ -27,15 +26,11 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-neutral-50">
+    <>
       <NewOrderAlertProvider restaurantId={restaurantId} />
-      <DashboardSidebar restaurantId={restaurantId} userRole={membership.role} />
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <DashboardHeader restaurantId={restaurantId} user={session.user} />
-        <main className="flex-1 overflow-auto p-4 sm:p-6" id="main-content">
-          {children}
-        </main>
-      </div>
-    </div>
+      <DashboardShell restaurantId={restaurantId} userRole={membership.role} user={session.user}>
+        {children}
+      </DashboardShell>
+    </>
   );
 }
