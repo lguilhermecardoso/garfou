@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { formatDate } from "@/lib/utils";
 import type { Metadata } from "next";
 import { Users } from "lucide-react";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 
 export const metadata: Metadata = { title: "Clientes" };
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{ q?: string; page?: string; pageSize?: string }>;
 }
 
 export default async function CustomersPage({ params, searchParams }: Props) {
@@ -17,20 +18,18 @@ export default async function CustomersPage({ params, searchParams }: Props) {
   if (!session?.user) redirect("/auth/signin");
 
   const { restaurantId } = await params;
-  const { q, page = "1" } = await searchParams;
-  const take = 20;
-  const skip = (parseInt(page) - 1) * take;
+  const { q, page: rawPage, pageSize: rawPageSize } = await searchParams;
+  const page = Math.max(1, Number(rawPage) || 1);
+  const take = Math.max(1, Number(rawPageSize) || 20);
+  const skip = (page - 1) * take;
 
   const where = {
     restaurantId,
     deletedAt: null as null,
     ...(q
       ? {
-        OR: [
-          { name: { contains: q, mode: "insensitive" as const } },
-          { phone: { contains: q } },
-        ],
-      }
+          OR: [{ name: { contains: q, mode: "insensitive" as const } }, { phone: { contains: q } }],
+        }
       : {}),
   };
 
@@ -61,19 +60,22 @@ export default async function CustomersPage({ params, searchParams }: Props) {
           defaultValue={q}
           type="search"
           placeholder="Buscar por nome ou telefone..."
-          className="flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+          className="focus:ring-primary-400 flex-1 rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-sm focus:ring-2 focus:outline-none"
           aria-label="Buscar cliente"
         />
-        <button type="submit" className="rounded-xl bg-primary-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-primary-600">
+        <button
+          type="submit"
+          className="bg-primary-500 hover:bg-primary-600 rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+        >
           Buscar
         </button>
       </form>
 
       {/* Table */}
-      <div className="rounded-2xl bg-white shadow-sm overflow-hidden">
+      <div className="overflow-hidden rounded-2xl bg-white shadow-sm">
         <table className="w-full text-sm" aria-label="Lista de clientes">
           <thead>
-            <tr className="bg-neutral-50 border-b border-neutral-100">
+            <tr className="border-b border-neutral-100 bg-neutral-50">
               <th className="px-4 py-3 text-left font-semibold text-neutral-600">Cliente</th>
               <th className="px-4 py-3 text-left font-semibold text-neutral-600">Telefone</th>
               <th className="px-4 py-3 text-center font-semibold text-neutral-600">Pedidos</th>
@@ -97,7 +99,7 @@ export default async function CustomersPage({ params, searchParams }: Props) {
                   </td>
                   <td className="px-4 py-3 text-neutral-500">{c.phone ?? "—"}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className="inline-flex items-center justify-center rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-semibold text-primary-700">
+                    <span className="bg-primary-50 text-primary-700 inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold">
                       {c._count.orders}
                     </span>
                   </td>
@@ -107,22 +109,8 @@ export default async function CustomersPage({ params, searchParams }: Props) {
             )}
           </tbody>
         </table>
+        <PaginationControls page={page} pageSize={take} total={total} />
       </div>
-
-      {/* Pagination */}
-      {total > take && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-neutral-500">Página {page} de {Math.ceil(total / take)}</p>
-          <div className="flex gap-2">
-            {parseInt(page) > 1 && (
-              <a href={`?${q ? `q=${q}&` : ""}page=${parseInt(page) - 1}`} className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50">Anterior</a>
-            )}
-            {parseInt(page) < Math.ceil(total / take) && (
-              <a href={`?${q ? `q=${q}&` : ""}page=${parseInt(page) + 1}`} className="rounded-lg border px-3 py-1.5 text-sm hover:bg-neutral-50">Próxima</a>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

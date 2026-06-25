@@ -5,12 +5,13 @@ import { formatCurrency, formatDate, startOfDayBRT, brtDateStrToUTC } from "@/li
 import type { Metadata } from "next";
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
 import { DateRangeFilter } from "@/features/finance/date-range-filter";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 
 export const metadata: Metadata = { title: "Financeiro" };
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
-  searchParams: Promise<{ from?: string; to?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; page?: string; pageSize?: string }>;
 }
 
 export default async function FinancePage({ params, searchParams }: Props) {
@@ -18,7 +19,9 @@ export default async function FinancePage({ params, searchParams }: Props) {
   if (!session?.user) redirect("/auth/signin");
 
   const { restaurantId } = await params;
-  const { from: rawFrom, to: rawTo } = await searchParams;
+  const { from: rawFrom, to: rawTo, page: rawPage, pageSize: rawPageSize } = await searchParams;
+  const page = Math.max(1, Number(rawPage) || 1);
+  const pageSize = Math.max(1, Number(rawPageSize) || 20);
 
   const now = new Date();
 
@@ -49,19 +52,29 @@ export default async function FinancePage({ params, searchParams }: Props) {
     periodLabel = "mês atual";
   }
 
-  const entries = await prisma.financeEntry.findMany({
-    where: { restaurantId, date: { gte: startDate, lte: endDate } },
-    orderBy: { date: "desc" },
-    take: 200,
-  });
+  const dateFilter = { restaurantId, date: { gte: startDate, lte: endDate } };
+
+  const [incomeAgg, expenseAgg, total, entries] = await Promise.all([
+    prisma.financeEntry.aggregate({
+      where: { ...dateFilter, type: "REVENUE" },
+      _sum: { amount: true },
+    }),
+    prisma.financeEntry.aggregate({
+      where: { ...dateFilter, type: "EXPENSE" },
+      _sum: { amount: true },
+    }),
+    prisma.financeEntry.count({ where: dateFilter }),
+    prisma.financeEntry.findMany({
+      where: dateFilter,
+      orderBy: { date: "desc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
 
   const toNum = (v: unknown) => (typeof v === "number" ? v : Number(v));
-  const income = entries
-    .filter((e) => e.type === "REVENUE")
-    .reduce((a, e) => a + toNum(e.amount), 0);
-  const expense = entries
-    .filter((e) => e.type === "EXPENSE")
-    .reduce((a, e) => a + toNum(e.amount), 0);
+  const income = toNum(incomeAgg._sum.amount ?? 0);
+  const expense = toNum(expenseAgg._sum.amount ?? 0);
 
   return (
     <div className="space-y-6">
@@ -165,6 +178,7 @@ export default async function FinancePage({ params, searchParams }: Props) {
             </tbody>
           </table>
         </div>
+        <PaginationControls page={page} pageSize={pageSize} total={total} />
       </div>
     </div>
   );

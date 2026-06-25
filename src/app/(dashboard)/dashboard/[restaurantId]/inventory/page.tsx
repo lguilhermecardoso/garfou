@@ -4,26 +4,41 @@ import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { AlertTriangle, History } from "lucide-react";
 import { InventoryTable } from "@/features/inventory/inventory-table";
+import { PaginationControls } from "@/components/shared/pagination-controls";
 import Link from "next/link";
 
 export const metadata: Metadata = { title: "Estoque" };
 
 interface Props {
   params: Promise<{ restaurantId: string }>;
+  searchParams: Promise<{ page?: string; pageSize?: string }>;
 }
 
-export default async function InventoryPage({ params }: Props) {
+export default async function InventoryPage({ params, searchParams }: Props) {
   const session = await auth();
   if (!session?.user) redirect("/auth/signin");
 
   const { restaurantId } = await params;
+  const { page: rawPage, pageSize: rawPageSize } = await searchParams;
+  const page = Math.max(1, Number(rawPage) || 1);
+  const pageSize = Math.max(1, Number(rawPageSize) || 20);
 
-  const items = await prisma.inventoryItem.findMany({
-    where: { restaurantId, deletedAt: null },
-    orderBy: { name: "asc" },
-  });
+  // Lightweight pass over all items: accurate total + low-stock alert
+  const [allStockLevels, items] = await Promise.all([
+    prisma.inventoryItem.findMany({
+      where: { restaurantId, deletedAt: null },
+      select: { name: true, currentStock: true, minimumStock: true },
+    }),
+    prisma.inventoryItem.findMany({
+      where: { restaurantId, deletedAt: null },
+      orderBy: { name: "asc" },
+      skip: (page - 1) * pageSize,
+      take: pageSize,
+    }),
+  ]);
 
-  const lowStock = items.filter((i) => Number(i.currentStock) <= Number(i.minimumStock));
+  const total = allStockLevels.length;
+  const lowStock = allStockLevels.filter((i) => Number(i.currentStock) <= Number(i.minimumStock));
 
   // Convert Decimal to number for client component
   const serializedItems = items.map((item) => ({
@@ -41,7 +56,7 @@ export default async function InventoryPage({ params }: Props) {
         <div>
           <h1 className="text-2xl font-bold text-neutral-900">Estoque</h1>
           <p className="text-sm text-neutral-500">
-            {items.length} itens · {lowStock.length} com estoque baixo
+            {total} itens · {lowStock.length} com estoque baixo
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -75,6 +90,9 @@ export default async function InventoryPage({ params }: Props) {
       )}
 
       <InventoryTable items={serializedItems} restaurantId={restaurantId} />
+      <div className="rounded-2xl bg-white shadow-sm">
+        <PaginationControls page={page} pageSize={pageSize} total={total} />
+      </div>
     </div>
   );
 }
