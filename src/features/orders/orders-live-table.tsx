@@ -14,6 +14,8 @@ import {
   MessageCircle,
   ClipboardPlus,
   Trash2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { ManualOrderModal } from "./manual-order-modal";
 
@@ -91,6 +93,8 @@ function playDoorbell() {
   }
 }
 
+const PAGE_SIZE_OPTIONS = [20, 40, 50, 100];
+
 export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
   const [statusFilter, setStatusFilter] = useState(initialStatus ?? "");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -99,11 +103,19 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [confirmingCancelId, setConfirmingCancelId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
   const knownIds = useRef<Set<string>>(new Set());
 
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
   const fetchOrders = useCallback(async () => {
-    const qs = statusFilter ? `?status=${statusFilter}` : "";
-    const res = await fetch(`/api/restaurants/${restaurantId}/orders${qs}`);
+    const params = new URLSearchParams();
+    if (statusFilter) params.set("status", statusFilter);
+    params.set("page", String(page));
+    params.set("pageSize", String(pageSize));
+    const res = await fetch(`/api/restaurants/${restaurantId}/orders?${params}`);
     if (!res.ok) return;
     const data = await res.json();
     const fetched: Order[] = data.orders ?? data.data ?? [];
@@ -120,8 +132,9 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
     fetched.forEach((o) => knownIds.current.add(o.id));
 
     setOrders(fetched);
+    setTotal(data.total ?? fetched.length);
     setLoading(false);
-  }, [restaurantId, statusFilter]);
+  }, [restaurantId, statusFilter, page, pageSize]);
 
   useEffect(() => {
     knownIds.current = new Set();
@@ -169,7 +182,10 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-2">
             <button
-              onClick={() => setStatusFilter("")}
+              onClick={() => {
+                setStatusFilter("");
+                setPage(1);
+              }}
               className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === "" ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
             >
               Todos
@@ -177,7 +193,10 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
             {ALL_STATUSES.map((s) => (
               <button
                 key={s}
-                onClick={() => setStatusFilter(s)}
+                onClick={() => {
+                  setStatusFilter(s);
+                  setPage(1);
+                }}
                 className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${statusFilter === s ? "bg-primary-500 text-white" : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"}`}
               >
                 {STATUS_LABELS[s]}
@@ -390,6 +409,53 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
             </div>
           )}
         </div>
+
+        {/* Pagination */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
+            <span>Exibir</span>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-sm"
+            >
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <option key={size} value={size}>
+                  {size}
+                </option>
+              ))}
+            </select>
+            <span>
+              de {total} pedido{total === 1 ? "" : "s"}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page <= 1}
+              className="flex items-center gap-1 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+              Anterior
+            </button>
+            <span className="text-sm text-neutral-500">
+              Página {page} de {totalPages}
+            </span>
+            <button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page >= totalPages}
+              className="flex items-center gap-1 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Próxima
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+        </div>
+
         <p className="text-right text-xs text-neutral-400">Atualização automática a cada 5s</p>
       </div>
     </>
