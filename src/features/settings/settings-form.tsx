@@ -7,10 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ImageUpload } from "@/components/ui/image-upload";
 import { PhoneInput } from "@/components/ui/masked-input";
-import { Save, Store, Clock, Globe, ImageIcon } from "lucide-react";
+import { Save, Store, Clock, Globe, ImageIcon, CalendarClock } from "lucide-react";
 
 interface Props {
   restaurantId: string;
+}
+
+interface OperatingHourRow {
+  dayOfWeek: number;
+  openTime: string;
+  closeTime: string;
+  isClosed: boolean;
 }
 
 interface Restaurant {
@@ -25,6 +32,18 @@ interface Restaurant {
   banner: string | null;
   isOpen: boolean;
   settings: Record<string, unknown>;
+  operatingHours: OperatingHourRow[];
+}
+
+const DAY_LABELS = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+
+function defaultHours(): OperatingHourRow[] {
+  return Array.from({ length: 7 }, (_, dayOfWeek) => ({
+    dayOfWeek,
+    openTime: "18:00",
+    closeTime: "23:00",
+    isClosed: true,
+  }));
 }
 
 export function SettingsForm({ restaurantId }: Props) {
@@ -40,7 +59,12 @@ export function SettingsForm({ restaurantId }: Props) {
     banner: null as string | null,
     isOpen: false,
     isDeliveryOnly: false,
+    autoHours: false,
   });
+  const [hours, setHours] = useState<OperatingHourRow[]>(defaultHours());
+  const [bulkDays, setBulkDays] = useState<number[]>([]);
+  const [bulkOpenTime, setBulkOpenTime] = useState("19:00");
+  const [bulkCloseTime, setBulkCloseTime] = useState("23:00");
 
   const { data: restaurant, isLoading } = useQuery<Restaurant>({
     queryKey: ["restaurant-settings", restaurantId],
@@ -63,19 +87,43 @@ export function SettingsForm({ restaurantId }: Props) {
         banner: restaurant.banner,
         isOpen: restaurant.isOpen,
         isDeliveryOnly: (restaurant.settings?.isDeliveryOnly as boolean) ?? false,
+        autoHours: (restaurant.settings?.autoHours as boolean) ?? false,
       });
+      setHours((prev) =>
+        prev.map((row) => {
+          const saved = restaurant.operatingHours?.find((h) => h.dayOfWeek === row.dayOfWeek);
+          return saved ? { ...saved } : row;
+        })
+      );
     }
   }, [restaurant]);
 
+  function toggleBulkDay(day: number) {
+    setBulkDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  }
+
+  function applyBulkHours() {
+    if (bulkDays.length === 0) return;
+    setHours((prev) =>
+      prev.map((row) =>
+        bulkDays.includes(row.dayOfWeek)
+          ? { ...row, openTime: bulkOpenTime, closeTime: bulkCloseTime, isClosed: false }
+          : row
+      )
+    );
+    setBulkDays([]);
+  }
+
   const update = useMutation({
     mutationFn: async (data: typeof form) => {
-      const { isDeliveryOnly, ...rest } = data;
+      const { isDeliveryOnly, autoHours, ...rest } = data;
       const res = await fetch(`/api/restaurants/${restaurantId}/settings`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...rest,
-          settings: { ...(restaurant?.settings ?? {}), isDeliveryOnly },
+          settings: { ...(restaurant?.settings ?? {}), isDeliveryOnly, autoHours },
+          operatingHours: hours,
         }),
       });
       if (!res.ok) throw new Error("Erro ao salvar");
@@ -219,6 +267,150 @@ export function SettingsForm({ restaurantId }: Props) {
         </label>
       </div>
 
+      {/* Horário de funcionamento */}
+      <div className="space-y-4 rounded-2xl bg-white p-6 shadow-sm">
+        <div className="flex items-center gap-3 border-b border-neutral-100 pb-2">
+          <CalendarClock className="text-primary-500 h-5 w-5" aria-hidden="true" />
+          <h2 className="font-semibold text-neutral-900">Horário de funcionamento</h2>
+        </div>
+
+        <label className="flex cursor-pointer items-center gap-3">
+          <div className="relative">
+            <input
+              type="checkbox"
+              checked={form.autoHours}
+              onChange={(e) => setForm((p) => ({ ...p, autoHours: e.target.checked }))}
+              className="sr-only"
+            />
+            <div
+              className={`h-6 w-11 rounded-full transition-colors ${form.autoHours ? "bg-primary-500" : "bg-neutral-300"}`}
+            >
+              <div
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${form.autoHours ? "translate-x-5" : "translate-x-0.5"}`}
+              />
+            </div>
+          </div>
+          <div>
+            <p className="font-medium text-neutral-900">Abrir e fechar automaticamente</p>
+            <p className="text-sm text-neutral-400">
+              O cardápio digital abre e fecha sozinho conforme os horários abaixo
+            </p>
+          </div>
+        </label>
+
+        {form.autoHours && (
+          <div className="space-y-4 border-t border-neutral-100 pt-4">
+            {/* Bulk apply */}
+            <div className="space-y-3 rounded-xl border border-neutral-200 bg-neutral-50 p-4">
+              <p className="text-sm font-medium text-neutral-700">
+                Selecione os dias e o horário, depois aplique
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DAY_LABELS.map((label, day) => (
+                  <button
+                    key={day}
+                    type="button"
+                    onClick={() => toggleBulkDay(day)}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      bulkDays.includes(day)
+                        ? "bg-primary-500 text-white"
+                        : "bg-white text-neutral-600 ring-1 ring-neutral-200 hover:bg-neutral-100"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-end gap-2">
+                <div>
+                  <label className="text-xs text-neutral-500">Abre</label>
+                  <input
+                    type="time"
+                    value={bulkOpenTime}
+                    onChange={(e) => setBulkOpenTime(e.target.value)}
+                    className="mt-1 block rounded-lg border border-neutral-200 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-neutral-500">Fecha</label>
+                  <input
+                    type="time"
+                    value={bulkCloseTime}
+                    onChange={(e) => setBulkCloseTime(e.target.value)}
+                    className="mt-1 block rounded-lg border border-neutral-200 px-2 py-1.5 text-sm"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={applyBulkHours}
+                  disabled={bulkDays.length === 0}
+                >
+                  Aplicar aos dias selecionados
+                </Button>
+              </div>
+            </div>
+
+            {/* Per-day grid */}
+            <div className="space-y-1.5">
+              {hours.map((row, idx) => (
+                <div
+                  key={row.dayOfWeek}
+                  className="flex flex-wrap items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-neutral-50"
+                >
+                  <span className="w-10 text-sm font-semibold text-neutral-700">
+                    {DAY_LABELS[row.dayOfWeek]}
+                  </span>
+                  <label className="flex items-center gap-1.5 text-xs text-neutral-500">
+                    <input
+                      type="checkbox"
+                      checked={!row.isClosed}
+                      onChange={(e) =>
+                        setHours((prev) =>
+                          prev.map((r, i) =>
+                            i === idx ? { ...r, isClosed: !e.target.checked } : r
+                          )
+                        )
+                      }
+                    />
+                    Aberto
+                  </label>
+                  {!row.isClosed && (
+                    <>
+                      <input
+                        type="time"
+                        value={row.openTime}
+                        onChange={(e) =>
+                          setHours((prev) =>
+                            prev.map((r, i) => (i === idx ? { ...r, openTime: e.target.value } : r))
+                          )
+                        }
+                        className="rounded-lg border border-neutral-200 px-2 py-1 text-sm"
+                      />
+                      <span className="text-neutral-400">até</span>
+                      <input
+                        type="time"
+                        value={row.closeTime}
+                        onChange={(e) =>
+                          setHours((prev) =>
+                            prev.map((r, i) =>
+                              i === idx ? { ...r, closeTime: e.target.value } : r
+                            )
+                          )
+                        }
+                        className="rounded-lg border border-neutral-200 px-2 py-1 text-sm"
+                      />
+                    </>
+                  )}
+                  {row.isClosed && <span className="text-xs text-neutral-400">Fechado</span>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* Status */}
       <div className="rounded-2xl bg-white p-6 shadow-sm">
         <div className="mb-4 flex items-center gap-3 border-b border-neutral-100 pb-3">
@@ -243,10 +435,18 @@ export function SettingsForm({ restaurantId }: Props) {
           </div>
           <div>
             <p className="font-medium text-neutral-900">
-              {form.isOpen ? "Aberto agora" : "Fechado"}
+              {form.autoHours
+                ? form.isOpen
+                  ? "Seguindo horário automático"
+                  : "Pausado manualmente"
+                : form.isOpen
+                  ? "Aberto agora"
+                  : "Fechado"}
             </p>
             <p className="text-sm text-neutral-400">
-              Controla a disponibilidade do cardápio digital
+              {form.autoHours
+                ? "Desligue para pausar o cardápio mesmo dentro do horário programado"
+                : "Controla a disponibilidade do cardápio digital"}
             </p>
           </div>
         </label>

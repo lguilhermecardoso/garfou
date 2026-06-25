@@ -2,6 +2,10 @@ import { prisma } from "@/lib/db";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { DigitalMenuClient } from "@/features/menu/digital-menu-client";
+import { getEffectiveIsOpen } from "@/lib/store-hours";
+
+// Re-evaluate open/closed schedule periodically instead of caching indefinitely
+export const revalidate = 60;
 
 interface Props {
   params: Promise<{ slug: string }>;
@@ -37,10 +41,18 @@ export default async function DigitalMenuPage({ params, searchParams }: Props) {
       state: true,
       isOpen: true,
       settings: true,
+      operatingHours: true,
     },
   });
 
   if (!restaurant) notFound();
+
+  const settings = restaurant.settings as Record<string, unknown>;
+  const effectiveIsOpen = getEffectiveIsOpen(
+    restaurant.isOpen,
+    settings?.autoHours === true,
+    restaurant.operatingHours
+  );
 
   return (
     <DigitalMenuClient
@@ -52,8 +64,8 @@ export default async function DigitalMenuPage({ params, searchParams }: Props) {
       restaurantAddress={restaurant.address}
       restaurantCity={restaurant.city}
       restaurantState={restaurant.state}
-      isOpen={restaurant.isOpen}
-      isDeliveryOnly={(restaurant.settings as Record<string, unknown>)?.isDeliveryOnly === true}
+      isOpen={effectiveIsOpen}
+      isDeliveryOnly={settings?.isDeliveryOnly === true}
       tableNumber={table}
     />
   );
