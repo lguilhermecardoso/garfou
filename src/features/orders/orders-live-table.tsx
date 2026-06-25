@@ -16,8 +16,11 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { ManualOrderModal } from "./manual-order-modal";
+import { getPageWindow } from "@/lib/pagination";
 
 const WA_MESSAGES: Partial<Record<string, string>> = {
   CONFIRMADO: "Olá {{name}}! Seu pedido #{{num}} foi confirmado ✅ Em breve estará pronto!",
@@ -433,25 +436,64 @@ export function OrdersLiveTable({ restaurantId, initialStatus }: Props) {
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setPage(1)}
+              disabled={page <= 1}
+              title="Primeira página"
+              aria-label="Primeira página"
+              className="flex items-center rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronsLeft className="h-4 w-4" aria-hidden="true" />
+            </button>
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page <= 1}
-              className="flex items-center gap-1 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Página anterior"
+              aria-label="Página anterior"
+              className="flex items-center rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-              Anterior
             </button>
-            <span className="text-sm text-neutral-500">
-              Página {page} de {totalPages}
-            </span>
+
+            {getPageWindow(page, totalPages).map((entry, idx) =>
+              entry === "ellipsis" ? (
+                <span key={`ellipsis-${idx}`} className="px-1.5 text-sm text-neutral-400">
+                  …
+                </span>
+              ) : (
+                <button
+                  key={entry}
+                  onClick={() => setPage(entry)}
+                  aria-current={entry === page ? "page" : undefined}
+                  className={`min-w-8 rounded-lg px-2 py-1.5 text-sm font-medium transition-colors ${
+                    entry === page
+                      ? "bg-primary-500 text-white"
+                      : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+                  }`}
+                >
+                  {entry}
+                </button>
+              )
+            )}
+
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page >= totalPages}
-              className="flex items-center gap-1 rounded-lg bg-neutral-100 px-3 py-1.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+              title="Próxima página"
+              aria-label="Próxima página"
+              className="flex items-center rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Próxima
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              onClick={() => setPage(totalPages)}
+              disabled={page >= totalPages}
+              title="Última página"
+              aria-label="Última página"
+              className="flex items-center rounded-lg bg-neutral-100 p-1.5 text-neutral-600 transition-colors hover:bg-neutral-200 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <ChevronsRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
