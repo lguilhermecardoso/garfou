@@ -60,6 +60,7 @@ interface TabDetail extends TabListItem {
       city?: string;
       state?: string;
     } | null;
+    paymentMethod?: string | null;
     items: Array<{
       id: string;
       quantity: number;
@@ -208,6 +209,19 @@ export function PosDashboard({ restaurantId }: Props) {
     },
     enabled: Boolean(selectedTabId),
   });
+
+  // Auto-fill payment method from the tab's orders when tab detail loads
+  useEffect(() => {
+    if (!selectedTab) return;
+    const activeOrders = selectedTab.orders.filter((o) => o.status !== "CANCELADO");
+    const methods = activeOrders.map((o) => o.paymentMethod).filter((m): m is string => !!m);
+    if (methods.length === 0) return;
+    // Most frequent method wins; tie broken by last order
+    const freq: Record<string, number> = {};
+    for (const m of methods) freq[m] = (freq[m] ?? 0) + 1;
+    const dominant = Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0];
+    setPaymentMethod(dominant as PaymentMethod);
+  }, [selectedTab?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Tab close calculations ──
   const total = Number(selectedTab?.total ?? 0);
