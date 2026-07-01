@@ -124,6 +124,7 @@ export function PosDashboard({ restaurantId }: Props) {
 
   // ── New order modal state ──
   const [isNewOrderOpen, setIsNewOrderOpen] = useState(false);
+  const [mobilePanelCart, setMobilePanelCart] = useState(false);
   const [newOrderSearch, setNewOrderSearch] = useState("");
   const [newOrderCart, setNewOrderCart] = useState<
     {
@@ -296,6 +297,7 @@ export function PosDashboard({ restaurantId }: Props) {
     setNewOrderPaymentMethod("PIX");
     setNewOrderTrocoParaValue("");
     setNewOrderSearch("");
+    setMobilePanelCart(false);
   }
 
   async function submitNewOrder() {
@@ -510,9 +512,50 @@ export function PosDashboard({ restaurantId }: Props) {
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[360px_1fr]">
-        {/* ── Tab list ── */}
-        <Card>
+      {/* ── Tab list — horizontal scroll on mobile, sidebar on desktop ── */}
+      {isLoading ? (
+        <p className="text-sm text-neutral-500">Carregando comandas...</p>
+      ) : tabs.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+          Nenhuma comanda aberta. Use o botão &ldquo;Novo pedido&rdquo; para criar uma.
+        </p>
+      ) : (
+        <div className="flex gap-2 overflow-x-auto pb-1 lg:hidden">
+          {tabs.map((tab) => {
+            const isActive = tab.id === selectedTabId;
+            const label = tab.table
+              ? `Mesa ${tab.table.identifier}`
+              : (tab.customer?.name ?? tab.guestCustomerName ?? "Avulso");
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setSelectedTabId(tab.id)}
+                className={`flex shrink-0 flex-col rounded-2xl border px-4 py-2.5 text-left transition-colors ${
+                  isActive
+                    ? "border-primary-500 bg-primary-50"
+                    : "border-neutral-200 bg-white hover:border-neutral-300"
+                }`}
+              >
+                <span className="flex items-center gap-1.5 text-sm font-semibold text-neutral-900">
+                  {tab.table ? (
+                    <Store className="h-3.5 w-3.5 text-neutral-400" />
+                  ) : (
+                    <UserRound className="h-3.5 w-3.5 text-neutral-400" />
+                  )}
+                  {label}
+                </span>
+                <span className="text-primary-600 text-xs font-bold">
+                  {formatCurrency(tab.total)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      <div className="grid gap-6 lg:grid-cols-[300px_1fr]">
+        {/* ── Tab list sidebar — desktop only ── */}
+        <Card className="hidden lg:block">
           <CardContent className="p-4">
             <div className="mb-4 flex items-center gap-2">
               <Receipt className="text-primary-500 h-4 w-4" aria-hidden="true" />
@@ -886,14 +929,16 @@ export function PosDashboard({ restaurantId }: Props) {
       {/* ── New order modal ── */}
       {isNewOrderOpen && (
         <div
-          className="fixed inset-0 z-50 flex items-stretch bg-black/60"
+          className="fixed inset-0 z-50 flex bg-black/60"
           role="dialog"
           aria-modal="true"
           aria-label="Novo pedido"
         >
-          <div className="flex w-full flex-col bg-white md:flex-row">
-            {/* Left: product picker */}
-            <div className="flex flex-1 flex-col overflow-hidden">
+          <div className="relative flex w-full flex-col bg-white md:flex-row">
+            {/* ── Products panel (hidden on mobile when cart is open) ── */}
+            <div
+              className={`flex flex-1 flex-col overflow-hidden ${mobilePanelCart ? "hidden md:flex" : "flex"}`}
+            >
               <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
                 <h2 className="text-lg font-bold text-neutral-900">Novo pedido avulso</h2>
                 <button
@@ -923,7 +968,8 @@ export function PosDashboard({ restaurantId }: Props) {
                 </div>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-5 py-4">
+              {/* Products grid — bottom padding leaves room for the floating cart bar */}
+              <div className="flex-1 overflow-y-auto px-5 py-4 pb-24 md:pb-4">
                 {menuCategories.length === 0 ? (
                   <div className="flex h-40 items-center justify-center text-sm text-neutral-400">
                     Carregando cardápio...
@@ -981,17 +1027,56 @@ export function PosDashboard({ restaurantId }: Props) {
                   </div>
                 )}
               </div>
+
+              {/* Floating cart bar — mobile only, visible when there are items */}
+              {newOrderCartCount > 0 && (
+                <div className="absolute right-0 bottom-0 left-0 border-t border-neutral-100 bg-white p-4 shadow-lg md:hidden">
+                  <button
+                    onClick={() => setMobilePanelCart(true)}
+                    className="bg-primary-500 flex w-full items-center justify-between rounded-2xl px-5 py-3.5 text-white"
+                  >
+                    <span className="flex items-center gap-2 text-sm font-semibold">
+                      <ShoppingCart className="h-4 w-4" aria-hidden="true" />
+                      {newOrderCartCount} {newOrderCartCount === 1 ? "item" : "itens"}
+                    </span>
+                    <span className="text-base font-bold">{formatCurrency(newOrderSubtotal)}</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            {/* Right: cart + order details */}
-            <div className="flex w-full flex-col border-l border-neutral-100 bg-neutral-50 md:w-96">
+            {/* ── Cart + order details panel ── */}
+            <div
+              className={`flex w-full flex-col border-l border-neutral-100 bg-neutral-50 md:w-96 ${mobilePanelCart ? "flex" : "hidden md:flex"}`}
+            >
+              {/* Cart header */}
               <div className="flex items-center gap-2 border-b border-neutral-100 bg-white px-5 py-4">
+                {/* Back button — mobile only */}
+                <button
+                  onClick={() => setMobilePanelCart(false)}
+                  className="mr-1 rounded-lg p-1 text-neutral-500 hover:bg-neutral-100 md:hidden"
+                  aria-label="Voltar para produtos"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
                 <ShoppingCart className="h-4 w-4 text-neutral-500" aria-hidden="true" />
-                <h3 className="font-semibold text-neutral-900">
+                <h3 className="flex-1 font-semibold text-neutral-900">
                   Carrinho ({newOrderCartCount} {newOrderCartCount === 1 ? "item" : "itens"})
                 </h3>
+                {/* Close modal — mobile only, shows when in cart panel */}
+                <button
+                  onClick={() => {
+                    setIsNewOrderOpen(false);
+                    resetNewOrder();
+                  }}
+                  aria-label="Fechar"
+                  className="md:hidden"
+                >
+                  <X className="h-5 w-5 text-neutral-500" aria-hidden="true" />
+                </button>
               </div>
 
+              {/* Cart items — scrollable */}
               <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
                 {newOrderCart.length === 0 ? (
                   <p className="py-8 text-center text-sm text-neutral-400">
@@ -1004,7 +1089,7 @@ export function PosDashboard({ restaurantId }: Props) {
                     return (
                       <div
                         key={item.productId}
-                        className="space-y-2 rounded-xl bg-white p-3 shadow-sm"
+                        className="space-y-3 rounded-xl bg-white p-4 shadow-sm"
                       >
                         {/* Item row */}
                         <div className="flex items-center justify-between gap-3">
@@ -1021,15 +1106,15 @@ export function PosDashboard({ restaurantId }: Props) {
                               )}
                             </p>
                           </div>
-                          <div className="flex shrink-0 items-center gap-1.5">
+                          <div className="flex shrink-0 items-center gap-2">
                             <button
                               onClick={() => removeFromNewCart(item.productId)}
-                              className="flex h-6 w-6 items-center justify-center rounded-full bg-neutral-200"
+                              className="flex h-8 w-8 items-center justify-center rounded-full bg-neutral-200"
                               aria-label={`Remover ${item.name}`}
                             >
-                              <Minus className="h-3 w-3" aria-hidden="true" />
+                              <Minus className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
-                            <span className="w-5 text-center text-sm font-bold">
+                            <span className="w-6 text-center text-sm font-bold">
                               {item.quantity}
                             </span>
                             <button
@@ -1041,25 +1126,25 @@ export function PosDashboard({ restaurantId }: Props) {
                                   isActive: true,
                                 })
                               }
-                              className="bg-primary-500 flex h-6 w-6 items-center justify-center rounded-full text-white"
+                              className="bg-primary-500 flex h-8 w-8 items-center justify-center rounded-full text-white"
                               aria-label={`Adicionar ${item.name}`}
                             >
-                              <Plus className="h-3 w-3" aria-hidden="true" />
+                              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
                             </button>
                           </div>
                         </div>
 
                         {/* Custom addons list */}
                         {item.customAddons.length > 0 && (
-                          <ul className="space-y-1 pl-1">
+                          <ul className="space-y-1.5 rounded-lg bg-amber-50 px-3 py-2">
                             {item.customAddons.map((a, idx) => (
                               <li
                                 key={idx}
-                                className="flex items-center justify-between text-xs text-neutral-600"
+                                className="flex items-center justify-between text-xs text-neutral-700"
                               >
-                                <span>+ {a.name}</span>
+                                <span className="font-medium">+ {a.name}</span>
                                 <div className="flex items-center gap-2">
-                                  <span className="font-medium text-amber-700">
+                                  <span className="font-semibold text-amber-700">
                                     {formatCurrency(a.unitPrice)}
                                   </span>
                                   <button
@@ -1077,10 +1162,10 @@ export function PosDashboard({ restaurantId }: Props) {
                                         )
                                       )
                                     }
-                                    className="text-red-400 hover:text-red-600"
+                                    className="rounded p-0.5 text-red-400 hover:bg-red-50 hover:text-red-600"
                                     aria-label="Remover adicional"
                                   >
-                                    <X className="h-3 w-3" />
+                                    <X className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
                               </li>
@@ -1088,11 +1173,12 @@ export function PosDashboard({ restaurantId }: Props) {
                           </ul>
                         )}
 
-                        {/* Add addon inline */}
-                        <div className="flex items-center gap-1.5">
+                        {/* Add addon — 2 rows for readability */}
+                        <div className="space-y-2 rounded-lg border border-dashed border-neutral-200 p-2">
+                          <p className="text-xs font-medium text-neutral-400">Adicionar extra</p>
                           <input
                             type="text"
-                            placeholder="Ex: Bacon, Queijo..."
+                            placeholder="Ex: Bacon, Queijo extra..."
                             value={input.name}
                             onChange={(e) =>
                               setAddonInputs((prev) => ({
@@ -1100,50 +1186,53 @@ export function PosDashboard({ restaurantId }: Props) {
                                 [item.productId]: { ...input, name: e.target.value },
                               }))
                             }
-                            className="min-w-0 flex-1 rounded-lg border border-neutral-200 px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
                           />
-                          <input
-                            type="number"
-                            placeholder="R$"
-                            value={input.price}
-                            min="0"
-                            step="0.50"
-                            onChange={(e) =>
-                              setAddonInputs((prev) => ({
-                                ...prev,
-                                [item.productId]: { ...input, price: e.target.value },
-                              }))
-                            }
-                            className="w-16 rounded-lg border border-neutral-200 px-2 py-1 text-xs focus:ring-1 focus:ring-amber-400 focus:outline-none"
-                          />
-                          <button
-                            onClick={() => {
-                              const price = parseFloat(input.price) || 0;
-                              if (!input.name.trim() || price < 0) return;
-                              setNewOrderCart((prev) =>
-                                prev.map((i) =>
-                                  i.productId === item.productId
-                                    ? {
-                                        ...i,
-                                        customAddons: [
-                                          ...i.customAddons,
-                                          { name: input.name.trim(), unitPrice: price },
-                                        ],
-                                      }
-                                    : i
-                                )
-                              );
-                              setAddonInputs((prev) => ({
-                                ...prev,
-                                [item.productId]: { name: "", price: "" },
-                              }));
-                            }}
-                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white disabled:opacity-40"
-                            disabled={!input.name.trim()}
-                            aria-label="Adicionar extra"
-                          >
-                            <Plus className="h-3 w-3" />
-                          </button>
+                          <div className="flex gap-2">
+                            <input
+                              type="number"
+                              placeholder="Valor (R$)"
+                              value={input.price}
+                              min="0"
+                              step="0.50"
+                              onChange={(e) =>
+                                setAddonInputs((prev) => ({
+                                  ...prev,
+                                  [item.productId]: { ...input, price: e.target.value },
+                                }))
+                              }
+                              className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-sm focus:ring-1 focus:ring-amber-400 focus:outline-none"
+                            />
+                            <button
+                              onClick={() => {
+                                const price = parseFloat(input.price) || 0;
+                                if (!input.name.trim() || price < 0) return;
+                                setNewOrderCart((prev) =>
+                                  prev.map((i) =>
+                                    i.productId === item.productId
+                                      ? {
+                                          ...i,
+                                          customAddons: [
+                                            ...i.customAddons,
+                                            { name: input.name.trim(), unitPrice: price },
+                                          ],
+                                        }
+                                      : i
+                                  )
+                                );
+                                setAddonInputs((prev) => ({
+                                  ...prev,
+                                  [item.productId]: { name: "", price: "" },
+                                }));
+                              }}
+                              className="flex items-center gap-1.5 rounded-lg bg-amber-500 px-3 py-2 text-sm font-semibold text-white disabled:opacity-40"
+                              disabled={!input.name.trim()}
+                              aria-label="Adicionar extra"
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                              Add
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );
@@ -1151,7 +1240,7 @@ export function PosDashboard({ restaurantId }: Props) {
                 )}
               </div>
 
-              {/* Order details */}
+              {/* Order details (fixed at bottom of cart panel) */}
               <div className="space-y-4 border-t border-neutral-100 bg-white px-5 py-4">
                 <div>
                   <label className="text-xs font-semibold text-neutral-500">
@@ -1162,7 +1251,7 @@ export function PosDashboard({ restaurantId }: Props) {
                     placeholder="Ex.: João Silva"
                     value={newOrderCustomer}
                     onChange={(e) => setNewOrderCustomer(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2 text-sm focus:ring-2 focus:ring-neutral-300 focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-sm focus:ring-2 focus:ring-neutral-300 focus:outline-none"
                   />
                 </div>
 
@@ -1263,7 +1352,7 @@ export function PosDashboard({ restaurantId }: Props) {
                           setNewOrderPaymentMethod(value);
                           if (value !== "CASH") setNewOrderTrocoParaValue("");
                         }}
-                        className={`rounded-xl border py-2 text-xs font-semibold transition-colors ${
+                        className={`rounded-xl border py-2.5 text-xs font-semibold transition-colors ${
                           newOrderPaymentMethod === value
                             ? "border-primary-500 bg-primary-50 text-primary-700"
                             : "border-neutral-200 text-neutral-600 hover:bg-neutral-50"
